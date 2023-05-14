@@ -145,6 +145,7 @@ namespace YuzuEAUpdater
             string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
             Console.WriteLine("Move files and directory to root directory");
             Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
+            System.IO.File.Move("yuzu.exe", currentExe);
         }
 
         private static string getChangeLog()
