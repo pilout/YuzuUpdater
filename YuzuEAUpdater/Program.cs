@@ -19,21 +19,33 @@ namespace YuzuEAUpdater
 
         private static  string currentVersion = null;
         private static Release myCurrentRelease = null;
+        private static string currentExe = "yuzu.exe";
 
 
         static void Main(string[] args)
         {
+            getSettings();
             getCurrentVersion();
             checkVersion();
             Console.WriteLine("Starting Yuzu...");
-            Process.Start("yuzu.exe");
+            Process.Start(currentExe);
+        }
+
+        private static void getSettings()
+        {
+            if (System.IO.File.Exists("launchUpdater.txt"))
+            {
+                StreamReader reader = new StreamReader("launchUpdater.txt");
+                currentExe = reader.ReadToEnd().Replace("\r\n", "");
+                reader.Close();
+            }
         }
 
         static void getCurrentVersion()
         {
-            if(System.IO.File.Exists("yuzu.exe"))
+            if(System.IO.File.Exists(currentExe))
             {
-                StreamReader reader = new StreamReader("yuzu.exe");
+                StreamReader reader = new StreamReader(currentExe);
                 currentVersion = reader.ReadToEnd();
                 reader.Close();
                 var index = currentVersion.IndexOf("yuzu Early Access");
