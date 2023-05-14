@@ -1,6 +1,8 @@
 # YuzuEAUpdater
 -Download and start yuzu directly after update. (Replace old files and launch)
+
 -Can install from scratch too if no installation found.
+
 -List all change since last update.
 
 
