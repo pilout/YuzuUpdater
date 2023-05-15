@@ -5,8 +5,12 @@
 
 -List all change since last update.
 
+-You can configure the yuzu executable file by adding a launchUpdater.txt file in folder and write the exe to execute in it.
 
-You must put the exe in the yuzu folder.
-Work only for EA access and windows.
+# Recommendation
+-You must put the exe in the yuzu folder.
 
-You can configure the yuzu executable file by adding a launchUpdater.txt file in folder and write the exe to execute in it.
+-Work only for EA access and windows.
+
+-Start yuzu from the updater for automaticaly update :).
+
