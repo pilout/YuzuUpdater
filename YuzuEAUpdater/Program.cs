@@ -24,7 +24,6 @@ namespace YuzuEAUpdater
         static void Main(string[] args)
         {
             getSettings();
-            killYuzus();
             getCurrentVersion();
             checkVersion();
 			waitYuzuLaunch();
@@ -33,6 +32,9 @@ namespace YuzuEAUpdater
         private static void killYuzus()
         {
             Process[] processes = Process.GetProcessesByName(currentExe.Replace(".exe",""));
+            if (processes.Length > 0)
+                Console.WriteLine("Kill yuzu process");
+
             foreach (Process p in processes)
             {
                 p.Kill();
@@ -157,9 +159,8 @@ namespace YuzuEAUpdater
         private static  void  downloadRelease(Release release)
         {
 			try{
-				
-			
-				Console.WriteLine("Downloading "+ release.version + " version");
+                killYuzus();
+                Console.WriteLine("Downloading "+ release.version + " version");
 				WebClient client = new WebClient();
 				client.DownloadFile(release.downloadUrl, "YuzuEA.zip");
 				ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
