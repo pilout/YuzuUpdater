@@ -24,13 +24,24 @@ namespace YuzuEAUpdater
         static void Main(string[] args)
         {
             getSettings();
+            killYuzus();
             getCurrentVersion();
             checkVersion();
 			waitYuzuLaunch();
         }
+
+        private static void killYuzus()
+        {
+            Process[] processes = Process.GetProcessesByName(currentExe.Replace(".exe",""));
+            foreach (Process p in processes)
+            {
+                p.Kill();
+            }
+        }
 		
 		private static void waitYuzuLaunch(){
-			Console.Write("Starting Yuzu...");
+
+            Console.Write("Starting Yuzu...");
             Process p = Process.Start(currentExe);
 			
 			while(p.MainWindowHandle==IntPtr.Zero){
@@ -70,7 +81,7 @@ namespace YuzuEAUpdater
         public static void checkVersion()
         {
 
-            Console.WriteLine("Retrives releases from github");
+            Console.WriteLine("Check for YUZU EA update");
             WebClient client = new WebClient();
             String src = client.DownloadString("https://github.com/pineappleEA/pineapple-src/releases/");
 
@@ -83,71 +94,74 @@ namespace YuzuEAUpdater
             }
 
             if(currentVersion == null)
-            {
                 Console.WriteLine("No version found, but find latest version");
-
-      
-            }
-            else
+            
+            myCurrentRelease = releases.Where(x => x.version == currentVersion).FirstOrDefault();
+            if(myCurrentRelease == null)
+                myCurrentRelease = new Release(currentVersion,true);
+            
+            if (myCurrentRelease != releases.FirstOrDefault())
             {
-                myCurrentRelease = releases.Where(x => x.version == currentVersion).FirstOrDefault();
-                if (myCurrentRelease != null)
+                Console.WriteLine("Retrieve PRs from github");
+                for (var p = 0; p < 4; p++)
                 {
-                    if (myCurrentRelease != releases.FirstOrDefault())
+                    src = client.DownloadString("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc");
+
+                    string[] prs = src.Split(new String[] { "<div class=\"flex-auto min-width-0 p-2 pr-3 pr-md-2\">" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+                    prs = prs.Take(prs.Length - 1).ToArray();
+
+                    for (int i = 0; i < prs.Length; i++)
                     {
-                        Console.WriteLine("Retrieve PRs from github");
-                        for (var p = 0; p < 4; p++)
-                        {
-                            src = client.DownloadString("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc");
-
-                            string[] prs = src.Split(new String[] { "<div class=\"flex-auto min-width-0 p-2 pr-3 pr-md-2\">" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
-                            prs = prs.Take(prs.Length - 1).ToArray();
-
-                            for (int i = 0; i < prs.Length; i++)
-                            {
-                                var pr = new PR(prs[i]);
-                                //CHECK IF UNIQUE BECAUSE BUG IDK WHY
-                                if(prList.FirstOrDefault(x => x.idIssue == pr.idIssue) == null)
-                                 prList.Add(pr);
-                            }
-                        }
-
-
-                        string changeLog = getChangeLog();
-
-                    }
-                    else
-                    {
-                        Console.WriteLine("Yuzu is up to date");
-                        return;
+                        var pr = new PR(prs[i]);
+                        //CHECK IF UNIQUE BECAUSE BUG IDK WHY
+                        if(prList.FirstOrDefault(x => x.idIssue == pr.idIssue) == null)
+                            prList.Add(pr);
                     }
                 }
+
+
+                string changeLog = getChangeLog();
+
                 Console.WriteLine("New Version found , pass from " + currentVersion + " to " + releases[0].version + "\n" + getChangeLog());
+                Console.WriteLine("Do you want to download it ? (y/n)");
+                string answer = Console.ReadLine();
+                if (answer == "y")
+                {
+                    downloadRelease(releases[0]);
+                }
 
-            }
-
-            Console.WriteLine("Do you want to download it ? (y/n)");
-            string answer = Console.ReadLine();
-            if (answer == "y")
-            {
-                downloadLastedVersion();
             }
             else
             {
-                Console.WriteLine("Ok, bye");
-                System.Environment.Exit(0);
+                Console.WriteLine("Yuzu is up to date");
             }
+            
+            
 
+            while (true)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Do you want another things ?");
+                Console.WriteLine("-switch <buildID>");
+                Console.WriteLine("Nothing , launch yuzu");
+                var buildId = Regex.Match(Console.ReadLine(), @"-switch (\d+)").Groups[1].Value;
+                if (buildId != "")
+                {
+                    downloadRelease(new Release(buildId, true));
+                }
+                else
+                    return;
+            }
         }
 
-        private static  void  downloadLastedVersion()
+        private static  void  downloadRelease(Release release)
         {
 			try{
 				
 			
-				Console.WriteLine("Downloading latest version");
+				Console.WriteLine("Downloading "+ release.version + " version");
 				WebClient client = new WebClient();
-				client.DownloadFile(releases[0].downloadUrl, "YuzuEA.zip");
+				client.DownloadFile(release.downloadUrl, "YuzuEA.zip");
 				ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
 				zip.ExtractToDirectory(System.Environment.CurrentDirectory,true);
 				zip.Dispose();
@@ -155,9 +169,9 @@ namespace YuzuEAUpdater
 				System.IO.File.Delete("YuzuEA.zip");
 				string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
 				Console.WriteLine("Move files and directory to root directory");
-				Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
-				if(File.Exists(currentExe))
-					System.IO.File.Delete(currentExe);
+                if (File.Exists(currentExe))
+                    System.IO.File.Delete(currentExe);
+                Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
 				System.IO.File.Move("yuzu.exe", currentExe);
 			}
 			catch(Exception ex){
@@ -186,9 +200,23 @@ namespace YuzuEAUpdater
         {
 
             this.version = Regex.Match(releaseVersion, @""">(.*)</h2>").Groups[1].Value;
-            this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/"+ version + "/Windows-Yuzu-"+ version + ".zip";
+            this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/"+ this.version + "/Windows-Yuzu-"+ this.version + ".zip";
             this.releaseDate = DateTime.Parse(Regex.Match(releaseVersion, @"datetime=""(.*)"">").Groups[1].Value);
 
+        }
+
+        public Release(string version,bool none)
+        {
+            if(version == null)
+            {
+                this.version = "EA-0";
+            }
+            else
+            {
+                this.version = "EA-" + version;
+            }
+            this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
+            this.releaseDate = DateTime.MinValue;
         }
 
         public string version;
