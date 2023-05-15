@@ -8,7 +8,6 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using static System.Net.WebRequestMethods;
 
 namespace YuzuEAUpdater
 {
@@ -27,9 +26,18 @@ namespace YuzuEAUpdater
             getSettings();
             getCurrentVersion();
             checkVersion();
-            Console.WriteLine("Starting Yuzu...");
-            Process.Start(currentExe);
+			waitYuzuLaunch();
         }
+		
+		private static void waitYuzuLaunch(){
+			Console.Write("Starting Yuzu...");
+            Process p = Process.Start(currentExe);
+			
+			while(p.MainWindowHandle==IntPtr.Zero){
+				System.Threading.Thread.Sleep(1000);
+				Console.Write(".");
+			}
+		}
 
         private static void getSettings()
         {
@@ -134,18 +142,28 @@ namespace YuzuEAUpdater
 
         private static  void  downloadLastedVersion()
         {
-            Console.WriteLine("Downloading latest version");
-            WebClient client = new WebClient();
-            client.DownloadFile(releases[0].downloadUrl, "YuzuEA.zip");
-            ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
-            zip.ExtractToDirectory(System.Environment.CurrentDirectory,true);
-            zip.Dispose();
-            Console.WriteLine("Remove zip file");
-            System.IO.File.Delete("YuzuEA.zip");
-            string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
-            Console.WriteLine("Move files and directory to root directory");
-            Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
-            System.IO.File.Move("yuzu.exe", currentExe);
+			try{
+				
+			
+				Console.WriteLine("Downloading latest version");
+				WebClient client = new WebClient();
+				client.DownloadFile(releases[0].downloadUrl, "YuzuEA.zip");
+				ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
+				zip.ExtractToDirectory(System.Environment.CurrentDirectory,true);
+				zip.Dispose();
+				Console.WriteLine("Remove zip file");
+				System.IO.File.Delete("YuzuEA.zip");
+				string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
+				Console.WriteLine("Move files and directory to root directory");
+				Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
+				if(File.Exists(currentExe))
+					System.IO.File.Delete(currentExe);
+				System.IO.File.Move("yuzu.exe", currentExe);
+			}
+			catch(Exception ex){
+				Console.WriteLine(ex.StackTrace + "  " + ex.Message);
+				Console.ReadLine();
+			}
         }
 
         private static string getChangeLog()
