@@ -239,10 +239,11 @@ namespace YuzuEAUpdater
 
         private static void download(String uri,String filename)
         {
-            httpClient().BaseAddress = new Uri(uri);
-            httpClient().DefaultRequestHeaders.Accept.Clear();
-            httpClient().DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
-            HttpResponseMessage response = httpClient().GetAsync(uri).Result;
+            HttpClient httpClient = httpClient();
+            httpClient.BaseAddress = new Uri(uri);
+            httpClient.DefaultRequestHeaders.Accept.Clear();
+            httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+            HttpResponseMessage response = httpClient.GetAsync(uri).Result;
             response.EnsureSuccessStatusCode();
             using (FileStream fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
