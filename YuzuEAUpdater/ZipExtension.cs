@@ -99,7 +99,9 @@ namespace YuzuEAUpdater
                    new RemoteCertificateValidationCallback(
                         delegate
                         { return true; }
-                    );
+                    );                    
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
             }
             catch (Exception ex)
             {
