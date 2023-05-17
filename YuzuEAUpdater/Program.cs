@@ -34,7 +34,13 @@ namespace YuzuEAUpdater
 
         private static void killYuzus()
         {
-            Process[] processes = Process.GetProcessesByName(currentExe.Replace(".exe",""));
+            Process[] processes = new Process[1];
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                Process.GetProcessesByName(currentExe.Replace(".exe", ""));
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                processes = Process.GetProcessesByName("yuzu");
+
             if (processes.Length > 0)
                 Console.WriteLine("Kill yuzu process");
 
@@ -47,9 +53,15 @@ namespace YuzuEAUpdater
 		private static void waitYuzuLaunch(){
 
             Console.Write("Starting Yuzu...");
-            Process p = Process.Start(currentExe);
+            Process p = new Process();
+            p.StartInfo.FileName = currentExe;
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+            p.Start();
 			
-			while(p.MainWindowHandle==IntPtr.Zero){
+			while(p.MainWindowHandle==IntPtr.Zero && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
 				System.Threading.Thread.Sleep(1000);
 				Console.Write(".");
                 p = Process.GetProcessById(p.Id);
@@ -72,9 +84,8 @@ namespace YuzuEAUpdater
         {
 
             HttpClientHandler httpClientHandler = new HttpClientHandler();
-            httpClientHandler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
             httpClientHandler.ClientCertificateOptions = ClientCertificateOption.Manual;
-            httpClientHandler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
+            httpClientHandler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
             HttpClient client = new HttpClient(httpClientHandler);
 
             return client ;
@@ -91,6 +102,7 @@ namespace YuzuEAUpdater
                 {
                     currentExe = files.First();
                     currentVersion = currentExe.Substring(currentExe.LastIndexOf("-") + 1, currentExe.LastIndexOf(".") - currentExe.LastIndexOf("-") - 1);
+                    currentVersion = "EA-" + currentVersion;
                     Console.WriteLine("Yuzu EA version found : " + currentVersion);
                 }
             }
@@ -283,7 +295,12 @@ namespace YuzuEAUpdater
             {
                 this.version = "EA-" + version;
             }
-            this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Linux-Yuzu-" + this.version + ".AppImage";
+            else
+                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
+
             this.releaseDate = DateTime.MinValue;
         }
 
