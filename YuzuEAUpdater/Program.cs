@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -49,7 +50,10 @@ namespace YuzuEAUpdater
 			while(p.MainWindowHandle==IntPtr.Zero){
 				System.Threading.Thread.Sleep(1000);
 				Console.Write(".");
-			}
+                p = Process.GetProcessById(p.Id);
+            }
+
+            System.Environment.Exit(0);
 		}
 
         private static void getSettings()
@@ -64,18 +68,33 @@ namespace YuzuEAUpdater
 
         static void getCurrentVersion()
         {
-            if(System.IO.File.Exists(currentExe))
-            {
-                StreamReader reader = new StreamReader(currentExe);
-                currentVersion = reader.ReadToEnd();
-                reader.Close();
-                var index = currentVersion.IndexOf("yuzu Early Access");
-                currentVersion = currentVersion.Substring(index - 20, 20).Replace("\0", "").Replace("\00", "");
-                if(currentVersion.StartsWith("0"))
-                    currentVersion = currentVersion.Substring(1);
 
-                currentVersion = "EA-" + currentVersion;
-                Console.WriteLine("Yuzu EA version found : " + currentVersion);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+           
+                var files = Directory.EnumerateFiles(System.Environment.CurrentDirectory, "*.AppImage");
+                if (files.Count() > 0)
+                {
+                    currentExe = files.First();
+                    currentVersion = currentExe.Substring(currentExe.LastIndexOf("-") + 1, currentExe.LastIndexOf(".") - currentExe.LastIndexOf("-") - 1);
+                    Console.WriteLine("Yuzu EA version found : " + currentVersion);
+                }
+            }
+            else
+            {
+                if (System.IO.File.Exists(currentExe))
+                {
+                    StreamReader reader = new StreamReader(currentExe);
+                    currentVersion = reader.ReadToEnd();
+                    reader.Close();
+                    var index = currentVersion.IndexOf("yuzu Early Access");
+                    currentVersion = currentVersion.Substring(index - 20, 20).Replace("\0", "").Replace("\00", "");
+                    if(currentVersion.StartsWith("0"))
+                        currentVersion = currentVersion.Substring(1);
+
+                    currentVersion = "EA-" + currentVersion;
+                    Console.WriteLine("Yuzu EA version found : " + currentVersion);
+                }
             }
 
         }
@@ -162,18 +181,34 @@ namespace YuzuEAUpdater
                 killYuzus();
                 Console.WriteLine("Downloading "+ release.version + " version");
 				WebClient client = new WebClient();
-				client.DownloadFile(release.downloadUrl, "YuzuEA.zip");
-				ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
-				zip.ExtractToDirectory(System.Environment.CurrentDirectory,true);
-				zip.Dispose();
-				Console.WriteLine("Remove zip file");
-				System.IO.File.Delete("YuzuEA.zip");
-				string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
-				Console.WriteLine("Move files and directory to root directory");
-                if (File.Exists(currentExe))
-                    System.IO.File.Delete(currentExe);
-                Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
-				System.IO.File.Move("yuzu.exe", currentExe);
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    String fileName = System.IO.Path.GetFileName(new Uri(release.downloadUrl).LocalPath);
+                    client.DownloadFile(release.downloadUrl, fileName);
+                    Console.WriteLine("Make executable");
+                    Process.Start("chmod", "+x " + fileName);
+                    Console.WriteLine("Remove old version");
+                    if (File.Exists(currentExe))
+                        System.IO.File.Delete(currentExe);
+
+                    currentExe = fileName;
+                }
+                else
+                {
+                    client.DownloadFile(release.downloadUrl, "YuzuEA.zip");
+                    ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
+                    zip.ExtractToDirectory(System.Environment.CurrentDirectory, true);
+                    zip.Dispose();
+                    Console.WriteLine("Remove zip file");
+                    System.IO.File.Delete("YuzuEA.zip");
+                    string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
+                    Console.WriteLine("Move files and directory to root directory");
+                    if (File.Exists(currentExe))
+                        System.IO.File.Delete(currentExe);
+                    Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
+                    System.IO.File.Move("yuzu.exe", currentExe);
+                }
 			}
 			catch(Exception ex){
 				Console.WriteLine(ex.StackTrace + "  " + ex.Message);
@@ -201,7 +236,11 @@ namespace YuzuEAUpdater
         {
 
             this.version = Regex.Match(releaseVersion, @""">(.*)</h2>").Groups[1].Value;
-            this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/"+ this.version + "/Windows-Yuzu-"+ this.version + ".zip";
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
+            else
+                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Linux-Yuzu-" + this.version + ".AppImage";
+
             this.releaseDate = DateTime.Parse(Regex.Match(releaseVersion, @"datetime=""(.*)"">").Groups[1].Value);
 
         }
