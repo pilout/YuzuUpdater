@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -99,12 +100,15 @@ namespace YuzuEAUpdater
 
         }
 
-        public static void checkVersion()
+        public static async void checkVersion()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
             Console.WriteLine("Check for YUZU EA update");
-            WebClient client = new WebClient();            
-            String src = client.DownloadString("https://github.com/pineappleEA/pineapple-src/releases/");
+            HttpClientHandler httpClientHandler = new HttpClientHandler();
+            httpClientHandler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
+            HttpClient client = new HttpClient(httpClientHandler);
+
+            String src = await client.GetAsync("https://github.com/pineappleEA/pineapple-src/releases/").Result.Content.ReadAsStringAsync();
             string[] releaseVersions = src.Split(new String[] { "h2 class=\"sr-only\"" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray(); 
             releaseVersions = releaseVersions.Take(releaseVersions.Length - 1).ToArray();
 
@@ -125,7 +129,7 @@ namespace YuzuEAUpdater
                 Console.WriteLine("Retrieve PRs from github");
                 for (var p = 0; p < 4; p++)
                 {
-                    src = client.DownloadString("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc");
+                    src = await client.GetAsync("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc").Result.Content.ReadAsStringAsync();
 
                     string[] prs = src.Split(new String[] { "<div class=\"flex-auto min-width-0 p-2 pr-3 pr-md-2\">" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
                     prs = prs.Take(prs.Length - 1).ToArray();
@@ -179,12 +183,22 @@ namespace YuzuEAUpdater
 			try{
                 killYuzus();
                 Console.WriteLine("Downloading "+ release.version + " version");
-				WebClient client = new WebClient();
+                HttpClientHandler httpClientHandler = new HttpClientHandler();
+                httpClientHandler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
+                HttpClient client = new HttpClient(httpClientHandler);
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     String fileName = System.IO.Path.GetFileName(new Uri(release.downloadUrl).LocalPath);
-                    client.DownloadFile(release.downloadUrl, fileName);
+                    client.BaseAddress = new Uri(release.downloadUrl);
+                    client.DefaultRequestHeaders.Accept.Clear();
+                    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+                    HttpResponseMessage response = client.GetAsync(release.downloadUrl).Result;
+                    response.EnsureSuccessStatusCode();
+                    using (FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        response.Content.CopyToAsync(fileStream).Wait();
+                    }
                     Console.WriteLine("Make executable");
                     Process.Start("chmod", "+x " + fileName);
                     Console.WriteLine("Remove old version");
@@ -195,7 +209,17 @@ namespace YuzuEAUpdater
                 }
                 else
                 {
-                    client.DownloadFile(release.downloadUrl, "YuzuEA.zip");
+
+                    Console.WriteLine("Download zip file");
+                    client.BaseAddress = new Uri(release.downloadUrl);
+                    client.DefaultRequestHeaders.Accept.Clear();
+                    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+                    HttpResponseMessage response = client.GetAsync(release.downloadUrl).Result;
+                    response.EnsureSuccessStatusCode();
+                    using (FileStream fileStream = new FileStream("YuzuEA.zip", FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        response.Content.CopyToAsync(fileStream).Wait();
+                    }
                     ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
                     zip.ExtractToDirectory(System.Environment.CurrentDirectory, true);
                     zip.Dispose();
@@ -236,9 +260,10 @@ namespace YuzuEAUpdater
 
             this.version = Regex.Match(releaseVersion, @""">(.*)</h2>").Groups[1].Value;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
-            else
                 this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Linux-Yuzu-" + this.version + ".AppImage";
+            else
+                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
+           
 
             this.releaseDate = DateTime.Parse(Regex.Match(releaseVersion, @"datetime=""(.*)"">").Groups[1].Value);
 
