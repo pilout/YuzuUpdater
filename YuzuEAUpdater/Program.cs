@@ -23,6 +23,7 @@ namespace YuzuEAUpdater
         private static string currentExe = "yuzu.exe";
 
 
+
         static void Main(string[] args)
         {
             getSettings();
@@ -67,6 +68,14 @@ namespace YuzuEAUpdater
             }
         }
 
+        private static HttpClient httpClient()
+        {
+
+            HttpClientHandler httpClientHandler = new HttpClientHandler();
+            httpClientHandler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
+            return new HttpClient(httpClientHandler);
+        }
+
         static void getCurrentVersion()
         {
 
@@ -100,15 +109,13 @@ namespace YuzuEAUpdater
 
         }
 
-        public static async void checkVersion()
+        public static void checkVersion()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
             Console.WriteLine("Check for YUZU EA update");
-            HttpClientHandler httpClientHandler = new HttpClientHandler();
-            httpClientHandler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
-            HttpClient client = new HttpClient(httpClientHandler);
 
-            String src = await client.GetAsync("https://github.com/pineappleEA/pineapple-src/releases/").Result.Content.ReadAsStringAsync();
+
+            String src =  httpClient().GetAsync("https://github.com/pineappleEA/pineapple-src/releases/").Result.Content.ReadAsStringAsync().Result;
             string[] releaseVersions = src.Split(new String[] { "h2 class=\"sr-only\"" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray(); 
             releaseVersions = releaseVersions.Take(releaseVersions.Length - 1).ToArray();
 
@@ -129,7 +136,7 @@ namespace YuzuEAUpdater
                 Console.WriteLine("Retrieve PRs from github");
                 for (var p = 0; p < 4; p++)
                 {
-                    src = await client.GetAsync("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc").Result.Content.ReadAsStringAsync();
+                    src = httpClient().GetAsync("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc").Result.Content.ReadAsStringAsync().Result;
 
                     string[] prs = src.Split(new String[] { "<div class=\"flex-auto min-width-0 p-2 pr-3 pr-md-2\">" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
                     prs = prs.Take(prs.Length - 1).ToArray();
@@ -183,22 +190,11 @@ namespace YuzuEAUpdater
 			try{
                 killYuzus();
                 Console.WriteLine("Downloading "+ release.version + " version");
-                HttpClientHandler httpClientHandler = new HttpClientHandler();
-                httpClientHandler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
-                HttpClient client = new HttpClient(httpClientHandler);
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     String fileName = System.IO.Path.GetFileName(new Uri(release.downloadUrl).LocalPath);
-                    client.BaseAddress = new Uri(release.downloadUrl);
-                    client.DefaultRequestHeaders.Accept.Clear();
-                    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
-                    HttpResponseMessage response = client.GetAsync(release.downloadUrl).Result;
-                    response.EnsureSuccessStatusCode();
-                    using (FileStream fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None))
-                    {
-                        response.Content.CopyToAsync(fileStream).Wait();
-                    }
+                    download(release.downloadUrl, fileName);
                     Console.WriteLine("Make executable");
                     Process.Start("chmod", "+x " + fileName);
                     Console.WriteLine("Remove old version");
@@ -209,17 +205,7 @@ namespace YuzuEAUpdater
                 }
                 else
                 {
-
-                    Console.WriteLine("Download zip file");
-                    client.BaseAddress = new Uri(release.downloadUrl);
-                    client.DefaultRequestHeaders.Accept.Clear();
-                    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
-                    HttpResponseMessage response = client.GetAsync(release.downloadUrl).Result;
-                    response.EnsureSuccessStatusCode();
-                    using (FileStream fileStream = new FileStream("YuzuEA.zip", FileMode.Create, FileAccess.Write, FileShare.None))
-                    {
-                        response.Content.CopyToAsync(fileStream).Wait();
-                    }
+                    download(release.downloadUrl, "YuzuEA.zip");
                     ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
                     zip.ExtractToDirectory(System.Environment.CurrentDirectory, true);
                     zip.Dispose();
@@ -249,6 +235,19 @@ namespace YuzuEAUpdater
                 changeLog += pr.idIssue + " - " + pr.description + " - " + pr.label + " - " + pr.releaseDate + "\n";
             }
             return changeLog;
+        }
+
+        private static void download(String uri,String filename)
+        {
+            httpClient().BaseAddress = new Uri(uri);
+            httpClient().DefaultRequestHeaders.Accept.Clear();
+            httpClient().DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+            HttpResponseMessage response = httpClient().GetAsync(uri).Result;
+            response.EnsureSuccessStatusCode();
+            using (FileStream fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                response.Content.CopyToAsync(fileStream).Wait();
+            }
         }
     }
 
@@ -309,4 +308,6 @@ namespace YuzuEAUpdater
         public string label = "";
 
     }
+
+
 }
