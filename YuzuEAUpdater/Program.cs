@@ -34,7 +34,7 @@ namespace YuzuEAUpdater
 
         private static void killYuzus()
         {
-            Process[] processes = new Process[1];
+            Process[] processes = new Process[0];
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 Process.GetProcessesByName(currentExe.Replace(".exe", ""));
