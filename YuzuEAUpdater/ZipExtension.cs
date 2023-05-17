@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO.Compression;
+using System.Net.Security;
+using System.Net;
 
 namespace YuzuEAUpdater
 {
@@ -85,6 +87,24 @@ namespace YuzuEAUpdater
 
             }
             Directory.Delete(dirInfo.FullName);
+        }
+
+
+        public static void InitiateSSLTrust()
+        {
+            try
+            {
+                //Change SSL checks so that all checks pass
+                ServicePointManager.ServerCertificateValidationCallback =
+                   new RemoteCertificateValidationCallback(
+                        delegate
+                        { return true; }
+                    );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.StackTrace + "  " + ex.Message);
+            }
         }
     }
 }

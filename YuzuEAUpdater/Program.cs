@@ -24,6 +24,7 @@ namespace YuzuEAUpdater
 
         static void Main(string[] args)
         {
+            Utils.InitiateSSLTrust();
             getSettings();
             getCurrentVersion();
             checkVersion();
@@ -115,7 +116,7 @@ namespace YuzuEAUpdater
             }
 
             if(currentVersion == null)
-                Console.WriteLine("No version found, but find latest version");
+                Console.WriteLine("No version found");
             
             myCurrentRelease = releases.Where(x => x.version == currentVersion).FirstOrDefault();
             if(myCurrentRelease == null)
