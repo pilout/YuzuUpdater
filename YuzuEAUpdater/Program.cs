@@ -72,8 +72,12 @@ namespace YuzuEAUpdater
         {
 
             HttpClientHandler httpClientHandler = new HttpClientHandler();
+            httpClientHandler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+            httpClientHandler.ClientCertificateOptions = ClientCertificateOption.Manual;
             httpClientHandler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => { return true; };
-            return new HttpClient(httpClientHandler);
+            HttpClient client = new HttpClient(httpClientHandler);
+
+            return client ;
         }
 
         static void getCurrentVersion()
@@ -239,11 +243,11 @@ namespace YuzuEAUpdater
 
         private static void download(String uri,String filename)
         {
-            HttpClient httpClient = httpClient();
-            httpClient.BaseAddress = new Uri(uri);
-            httpClient.DefaultRequestHeaders.Accept.Clear();
-            httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
-            HttpResponseMessage response = httpClient.GetAsync(uri).Result;
+            HttpClient _httpClient = httpClient();
+            _httpClient.BaseAddress = new Uri(uri);
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+            HttpResponseMessage response = _httpClient.GetAsync(uri).Result;
             response.EnsureSuccessStatusCode();
             using (FileStream fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
