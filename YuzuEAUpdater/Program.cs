@@ -24,7 +24,6 @@ namespace YuzuEAUpdater
 
         static void Main(string[] args)
         {
-            Utils.InitiateSSLTrust();
             getSettings();
             getCurrentVersion();
             checkVersion();
@@ -102,11 +101,10 @@ namespace YuzuEAUpdater
 
         public static void checkVersion()
         {
-
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
             Console.WriteLine("Check for YUZU EA update");
-            WebClient client = new WebClient();
+            WebClient client = new WebClient();            
             String src = client.DownloadString("https://github.com/pineappleEA/pineapple-src/releases/");
-
             string[] releaseVersions = src.Split(new String[] { "h2 class=\"sr-only\"" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray(); 
             releaseVersions = releaseVersions.Take(releaseVersions.Length - 1).ToArray();
 

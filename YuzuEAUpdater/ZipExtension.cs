@@ -90,23 +90,6 @@ namespace YuzuEAUpdater
         }
 
 
-        public static void InitiateSSLTrust()
-        {
-            try
-            {
-                //Change SSL checks so that all checks pass
-                ServicePointManager.ServerCertificateValidationCallback =
-                   new RemoteCertificateValidationCallback(
-                        delegate
-                        { return true; }
-                    );                    
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.StackTrace + "  " + ex.Message);
-            }
-        }
     }
 }
