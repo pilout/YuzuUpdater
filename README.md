@@ -8,6 +8,8 @@
 -You can configure the yuzu executable file by adding a launchUpdater.txt file in folder and write the exe to execute in it.
 
 -You can change yuzu build easyly with -switch <buildID>, sample : -switch 3489
+ 
+-You can download all mods from banana with -dmods
 
 # Recommendation
  
