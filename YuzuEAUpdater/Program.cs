@@ -7,9 +7,11 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using SevenZip;
+using SevenZip.Sdk.Compression.Lzma;
 
 namespace YuzuEAUpdater
 {
@@ -21,6 +23,7 @@ namespace YuzuEAUpdater
         private static  string currentVersion = null;
         private static Release myCurrentRelease = null;
         private static string currentExe = "yuzu.exe";
+        private static List<Game> games = new List<Game>();
 
 
 
@@ -37,7 +40,7 @@ namespace YuzuEAUpdater
             Process[] processes = new Process[0];
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                Process.GetProcessesByName(currentExe.Replace(".exe", ""));
+                processes = Process.GetProcessesByName(currentExe.Replace(".exe", ""));
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 processes = Process.GetProcessesByName("yuzu");
 
@@ -78,6 +81,8 @@ namespace YuzuEAUpdater
                 currentExe = reader.ReadToEnd().Replace("\r\n", "");
                 reader.Close();
             }
+
+            Utils.init7ZipPaht();
         }
 
         private static HttpClient httpClient()
@@ -190,11 +195,17 @@ namespace YuzuEAUpdater
                 Console.WriteLine();
                 Console.WriteLine("Do you want another things ?");
                 Console.WriteLine("-switch <buildID>");
+                Console.WriteLine("-dmods (Download all available mods in gamebanana)");
                 Console.WriteLine("Nothing , launch yuzu");
-                var buildId = Regex.Match(Console.ReadLine(), @"-switch (\d+)").Groups[1].Value;
+                String input = Console.ReadLine();
+                var buildId = Regex.Match(input, @"-switch (\d+)").Groups[1].Value;
                 if (buildId != "")
                 {
                     downloadRelease(new Release(buildId, true));
+                }
+                else if(input == "-dmods")
+                {
+                    downloadMods();
                 }
                 else
                     return;
@@ -214,7 +225,7 @@ namespace YuzuEAUpdater
                     Console.WriteLine("Make executable");
                     Process.Start("chmod", "+x " + fileName);
                     Console.WriteLine("Remove old version");
-                    if (File.Exists(currentExe))
+                    if (System.IO.File.Exists(currentExe))
                         System.IO.File.Delete(currentExe);
 
                     currentExe = fileName;
@@ -229,7 +240,7 @@ namespace YuzuEAUpdater
                     System.IO.File.Delete("YuzuEA.zip");
                     string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
                     Console.WriteLine("Move files and directory to root directory");
-                    if (File.Exists(currentExe))
+                    if (System.IO.File.Exists(currentExe))
                         System.IO.File.Delete(currentExe);
                     Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
                     System.IO.File.Move("yuzu.exe", currentExe);
@@ -266,6 +277,104 @@ namespace YuzuEAUpdater
                 response.Content.CopyToAsync(fileStream).Wait();
             }
         }
+
+
+        private static void downloadMods()
+        {
+            scanTitlesIdAndGetName();
+            if (games.Count == 0)
+            {
+                Console.WriteLine("No game found");
+                return;
+            }
+            else
+            {
+                Console.WriteLine("Select game to download mods");
+                String input = Console.ReadLine();
+                int index = 0;
+                if (int.TryParse(input, out index))
+                {
+                    if (index < games.Count)
+                    {
+                        Game game = games[index];
+                        game.loadMods();
+                        String yuzuLoadFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/yuzu/load/" + game.id;
+
+                        List<BananaMod> validMods = game.bananaMods.Where(x => x._sModelName == "Mod" && !x._bIsObsolete && x._bHasFiles).ToList();
+                        Console.WriteLine("Find " + validMods.Count + " mods for " + game.name);
+                        Console.WriteLine("Download all mods ? (y/n)");
+                        input = Console.ReadLine();
+                        if (input == "y")
+                        {
+                            List<Task> tasks = new List<Task>();
+                            index = 0;
+                            foreach (BananaMod mod in validMods)
+                            {
+                                Task task = new Task(() =>
+                                {
+                                    mod.download();
+                                    mod.extract(yuzuLoadFolder);
+                                });
+                                tasks.Add(task);
+                                task.Start();
+                                index++;
+
+                                if(index % 3 == 0)
+                                 Task.WaitAll(tasks.ToArray());
+
+                            }
+
+                            Task.WaitAll(tasks.ToArray());
+                            
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid index");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Invalid index");
+                }
+            }
+        }
+
+
+        private static void scanTitlesIdAndGetName()
+        {
+            if (games.Count == 0)
+            {
+                Console.WriteLine("");
+                Console.WriteLine("Scanning game from appdata");
+                var path = System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/yuzu/sdmc/atmosphere/contents";
+
+                if(!Directory.Exists(path))
+                    return;
+
+                String[] directorys = Directory.GetDirectories(path).Select(d => Path.GetFileName(d)).ToArray();
+
+                HttpClient _httpClient = httpClient();
+                String src = _httpClient.GetAsync("https://switchbrew.org/w/index.php?title=Title_list/Games&mobileaction=toggle_view_desktop").Result.Content.ReadAsStringAsync().Result;
+
+                foreach (String directory in directorys)
+                {
+                    String id = directory.Substring(0, 16);
+                    string name = Regex.Match(src, @"<td>" + id + @"</td>\s*<td>(.*)</td>").Groups[1].Value;
+
+                    if (name != "")
+                    {
+                        games.Add(new Game(id, name));
+                        Console.WriteLine(games.Count-1 + " - " + name);
+                    }
+
+                }
+            }
+        }
+
+ 
+
+      
     }
 
 
@@ -332,4 +441,180 @@ namespace YuzuEAUpdater
     }
 
 
+    public class Game
+    {
+        public string id;
+        public string name;
+        public List<BananaMod> bananaMods = new List<BananaMod>();
+
+        public Game(string id, string name)
+        {
+            this.id = id;
+            this.name = name;
+        }
+
+        public void loadMods()
+        {
+            if (bananaMods.Count == 0)
+            {
+                HttpClient _httpClient = new HttpClient();
+
+                String src = _httpClient.GetAsync("https://gamebanana.com/apiv11/Util/Game/NameMatch?_sName=" + name.Replace(" ", "+") + "&_nPerpage=10&_nPage=1").Result.Content.ReadAsStringAsync().Result;
+                String idGameBanana = Regex.Match(src, @"""_idRow"": (\d+)").Groups[1].Value;
+                BananaResponse bananaResponse = null;
+                int p = 1;
+                while (bananaResponse == null || bananaResponse._aRecords.Count > 0)
+                {
+                    src = _httpClient.GetAsync("https://gamebanana.com/apiv11/Game/" + idGameBanana + "/Subfeed?_nPage=" + p + "&_sSort=default").Result.Content.ReadAsStringAsync().Result;
+                    bananaResponse = JsonSerializer.Deserialize<BananaResponse>(src);
+                    bananaMods.AddRange(bananaResponse._aRecords);
+                    p++;
+                }
+            }
+        }
+    }
+
+
+    public class BananaResponse
+    {
+        public List<BananaMod> _aRecords { get; set; }
+
+    }
+
+    public class BananaFile
+    {
+        public int _idRow { get; set; }
+        public string _sFile { get; set; }
+        public int _nFilesize { get; set; }
+        public string _sDescription { get; set; }
+        public long _tsDateAdded { get; set; }
+        public int _nDownloadCount { get; set; }
+        public string _sAnalysisState { get; set; }
+        public string _sDownloadUrl { get; set; }
+        public string _sMd5Checksum { get; set; }
+        public string _sClamAvResult { get; set; }
+        public string _sAnalysisResult { get; set; }
+        public bool _bContainsExe { get; set; }
+
+    }
+
+    public class BananaMod
+    {
+        public int _idRow { get; set; }
+        public string _sModelName { get; set; }
+        public string _sSingularTitle { get; set; }
+        public string _sIconClasses { get; set; }
+        public string _sName { get; set; }
+        public string _sProfileUrl { get; set; }
+        public long _tsDateAdded { get; set; }
+        public long _tsDateModified { get; set; }
+        public bool _bHasFiles{ get; set; }
+        public string[] _aTags{ get; set; }
+        public string _sVersion{ get; set; }
+        public long _tsDateUpdated { get; set; }
+        public bool _bIsObsolete{ get; set; }
+        public string _sInitialVisibility{ get; set; }
+        public bool _bHasContentRatings{ get; set; }
+        public int _nLikeCount { get; set; }
+        public int _nPostCount { get; set; }
+        public bool _bWasFeatured{ get; set; }
+        public int _nViewCount { get; set; }
+        public bool _bIsOwnedByAccessor{ get; set; }
+
+        public List<BananaFile> files;
+
+
+        public void loadFiles()
+        {
+            HttpClient _httpClient = new HttpClient();
+            String uri = "https://gamebanana.com/apiv11/Mod/" + _idRow + "/Files";
+            String src = _httpClient.GetAsync(uri).Result.Content.ReadAsStringAsync().Result;
+            files = JsonSerializer.Deserialize<List<BananaFile>>(src);
+
+        }
+
+        public void download()
+        {
+            if(!Directory.Exists("_tempMod"))
+            {
+                Directory.CreateDirectory("_tempMod");
+            }
+
+            if(files == null) 
+                loadFiles();
+
+            foreach (BananaFile file in files)
+            {
+                if (file._sClamAvResult == "clean")
+                {
+                    using (var client = new WebClient())
+                    {
+                        if(file._sFile.EndsWith(".zip") || file._sFile.EndsWith(".7z"))
+                        {
+                            Console.WriteLine("       -Downloading " + file._sFile);
+                            if (System.IO.File.Exists("_tempMod/" + file._sFile))
+                            {
+                                System.IO.File.Delete("_tempMod/" + file._sFile);
+                            }
+
+                            try
+                            {
+                                client.DownloadFile(file._sDownloadUrl, "_tempMod/" + file._sFile);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine("Error while downloading " + file._sFile + " : " + e.Message);
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+
+        public void extract(String pathToExtract)
+        {
+
+            foreach (BananaFile f in files)
+            {
+                if (f._sFile.EndsWith(".zip") || f._sFile.EndsWith(".7z"))
+                {
+                    Console.WriteLine("       -Extracting " + f._sFile);
+                    try
+                    {
+                        if (f._sFile.EndsWith(".zip"))
+                        {
+                            ZipArchive zipArchive = ZipFile.OpenRead("_tempMod/" + f._sFile);
+                            bool isCorrectModFolder = zipArchive.Entries.ToList().FirstOrDefault(f => f.FullName.Contains("romfs") || f.FullName.Contains("exefs") || f.FullName.Contains("cheats")) != null;
+                            if(isCorrectModFolder)
+                                ZipFile.ExtractToDirectory("_tempMod/" + f._sFile, pathToExtract,true);
+
+                            zipArchive.Dispose();
+                        }
+                        else
+                        {
+                            SevenZipExtractor extractor = new SevenZipExtractor("_tempMod/" + f._sFile);
+                            bool isCorrectModFolder = extractor.ArchiveFileNames.ToList().FirstOrDefault(f => f.Contains("romfs") || f.Contains("exefs") || f.Contains("cheats")) != null;
+                            if (isCorrectModFolder)
+                                extractor.ExtractArchive(pathToExtract);
+
+                            extractor.Dispose();
+                        }
+                        System.Threading.Thread.Sleep(1000);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Error while extracting " + f._sFile + " : " + e.Message);
+                    }
+                    finally
+                    {
+                        if (System.IO.File.Exists("_tempMod/" + f._sFile))
+                        {
+                            System.IO.File.Delete("_tempMod/" + f._sFile);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

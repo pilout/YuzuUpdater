@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using System.IO.Compression;
 using System.Net.Security;
 using System.Net;
+using System.Runtime.InteropServices;
+using SevenZip;
 
 namespace YuzuEAUpdater
 {
@@ -90,6 +92,42 @@ namespace YuzuEAUpdater
         }
 
 
+        public static void init7ZipPaht()
+        {
+            var platForm = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
+            var OS = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "Linux" : RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Windows" : "MacOS";
+            bool check = File.Exists(Environment.CurrentDirectory + "/7zip/win32/x64/7zxa.dll");
+            if (OS == "Windows")
+            {
+                if (platForm == Architecture.X64)
+                {
+                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory+ "/7zip/win32/x64/7zxa.dll");
+                }
+                else if (platForm == Architecture.X86)
+                {
+                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/win32/ia32/7zxa.dll");
+                }
+            }
+            else if (OS == "Linux")
+            {
 
+                if (platForm == Architecture.X64)
+                {
+                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/x64/7zz");
+                }
+                else if (platForm == Architecture.X86)
+                {
+                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/ia32/7zz");
+                }
+                else if (platForm == Architecture.Arm)
+                {
+                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/arm/7zz");
+                }
+                else if (platForm == Architecture.Arm64)
+                {
+                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/arm64/7zz");
+                }
+            }
+        }
     }
 }
