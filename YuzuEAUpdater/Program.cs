@@ -298,7 +298,7 @@ namespace YuzuEAUpdater
                     {
                         Game game = games[index];
                         game.loadMods();
-                        String yuzuLoadFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/yuzu/load/" + game.id;
+                        String yuzuLoadFolder =  Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\yuzu\\load\\" + game.id;
 
                         List<BananaMod> validMods = game.bananaMods.Where(x => x._sModelName == "Mod" && !x._bIsObsolete && x._bHasFiles).ToList();
                         Console.WriteLine("Find " + validMods.Count + " mods for " + game.name);
