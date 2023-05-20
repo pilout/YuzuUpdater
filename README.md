@@ -10,9 +10,10 @@
 -You can change yuzu build easyly with -switch <buildID>, sample : -switch 3489
 
 # Recommendation
+ 
+-Requiere net core 3.1 : https://dotnet.microsoft.com/en-us/download/dotnet/3.1
+  
 -You must put the exe in the yuzu folder.
-
--Work only for EA access and windows.
 
 -Start yuzu from the updater for automaticaly update :).
 
