@@ -98,35 +98,44 @@ namespace YuzuEAUpdater
 
         static void getCurrentVersion()
         {
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            try
             {
-           
-                var files = Directory.EnumerateFiles(System.Environment.CurrentDirectory, "*.AppImage");
-                if (files.Count() > 0)
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    currentExe = files.First();
-                    currentVersion = currentExe.Substring(currentExe.LastIndexOf("-") + 1, currentExe.LastIndexOf(".") - currentExe.LastIndexOf("-") - 1);
-                    currentVersion = "EA-" + currentVersion;
-                    Console.WriteLine("Yuzu EA version found : " + currentVersion);
+
+                    var files = Directory.EnumerateFiles(System.Environment.CurrentDirectory, "*.AppImage");
+                    if (files.Count() > 0)
+                    {
+                        currentExe = files.First();
+                        currentVersion = currentExe.Substring(currentExe.LastIndexOf("-") + 1, currentExe.LastIndexOf(".") - currentExe.LastIndexOf("-") - 1);
+                        currentVersion = "EA-" + currentVersion;
+                        Console.WriteLine("Yuzu EA version found : " + currentVersion);
+                    }
+                }
+                else
+                {
+                    if (System.IO.File.Exists(currentExe))
+                    {
+                        StreamReader reader = new StreamReader(currentExe);
+                        currentVersion = reader.ReadToEnd();
+                        reader.Close();
+                        var index = currentVersion.IndexOf("yuzu Early Access");
+                        currentVersion = currentVersion.Substring(index - 20, 20).Replace("\0", "").Replace("\00", "");
+                        if (currentVersion.StartsWith("0"))
+                            currentVersion = currentVersion.Substring(1);
+
+                        currentVersion = "EA-" + currentVersion;
+                        Console.WriteLine("Yuzu EA version found : " + currentVersion);
+                    }
                 }
             }
-            else
-            {
-                if (System.IO.File.Exists(currentExe))
-                {
-                    StreamReader reader = new StreamReader(currentExe);
-                    currentVersion = reader.ReadToEnd();
-                    reader.Close();
-                    var index = currentVersion.IndexOf("yuzu Early Access");
-                    currentVersion = currentVersion.Substring(index - 20, 20).Replace("\0", "").Replace("\00", "");
-                    if(currentVersion.StartsWith("0"))
-                        currentVersion = currentVersion.Substring(1);
-
-                    currentVersion = "EA-" + currentVersion;
-                    Console.WriteLine("Yuzu EA version found : " + currentVersion);
-                }
+            catch(ArgumentOutOfRangeException e) 
+            { 
+                Console.WriteLine("Its seem you dont use EA Yuzu version.");
+                Console.WriteLine("You must use EA version from pineapple here : https://github.com/pineappleEA/pineapple-src/releases.");
             }
+
+
 
         }
 
@@ -196,8 +205,9 @@ namespace YuzuEAUpdater
                 Console.WriteLine("Do you want another things ?");
                 Console.WriteLine("-switch <buildID>");
                 Console.WriteLine("-dmods (Download all available mods in gamebanana)");
-                Console.WriteLine("Nothing , launch yuzu");
+                Console.WriteLine("-Nothing , launch yuzu");
                 String input = Console.ReadLine();
+                Console.WriteLine();
                 var buildId = Regex.Match(input, @"-switch (\d+)").Groups[1].Value;
                 if (buildId != "")
                 {
@@ -298,7 +308,6 @@ namespace YuzuEAUpdater
                     {
                         Game game = games[index];
                         game.loadMods();
-                        String yuzuLoadFolder =  Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\yuzu\\load\\" + game.id;
 
                         List<BananaMod> validMods = game.bananaMods.Where(x => x._sModelName == "Mod" && !x._bIsObsolete && x._bHasFiles).ToList();
                         Console.WriteLine("Find " + validMods.Count + " mods for " + game.name);
@@ -313,7 +322,7 @@ namespace YuzuEAUpdater
                                 Task task = new Task(() =>
                                 {
                                     mod.download();
-                                    mod.extract(yuzuLoadFolder);
+                                    mod.extract(game.pathMods);
                                 });
                                 tasks.Add(task);
                                 task.Start();
@@ -346,13 +355,16 @@ namespace YuzuEAUpdater
             if (games.Count == 0)
             {
                 Console.WriteLine("");
-                Console.WriteLine("Scanning game from appdata");
-                var path = System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/yuzu/sdmc/atmosphere/contents";
+                Console.WriteLine("Scanning game");
+                var path = System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/yuzu";
 
                 if(!Directory.Exists(path))
+                    path = "user";
+                if(!Directory.Exists(path + "/sdmc/atmosphere/contents"))
                     return;
 
-                String[] directorys = Directory.GetDirectories(path).Select(d => Path.GetFileName(d)).ToArray();
+
+               String[] directorys = Directory.GetDirectories(path+"/sdmc/atmosphere/contents").Select(d => Path.GetFileName(d)).ToArray();
 
                 HttpClient _httpClient = httpClient();
                 String src = _httpClient.GetAsync("https://switchbrew.org/w/index.php?title=Title_list/Games&mobileaction=toggle_view_desktop").Result.Content.ReadAsStringAsync().Result;
@@ -364,8 +376,8 @@ namespace YuzuEAUpdater
 
                     if (name != "")
                     {
-                        games.Add(new Game(id, name));
-                        Console.WriteLine(games.Count-1 + " - " + name);
+                        games.Add(new Game(id, name,path));
+                        Console.WriteLine(games.Count-1 + ")  " + name);
                     }
 
                 }
@@ -445,12 +457,22 @@ namespace YuzuEAUpdater
     {
         public string id;
         public string name;
+        public string pathApp;
         public List<BananaMod> bananaMods = new List<BananaMod>();
 
-        public Game(string id, string name)
+        public string pathMods
+        {
+            get
+            {
+                return pathApp + "\\load\\" + this.id;
+            }
+        }
+
+        public Game(string id, string name, string pathApp)
         {
             this.id = id;
             this.name = name;
+            this.pathApp = pathApp;
         }
 
         public void loadMods()
