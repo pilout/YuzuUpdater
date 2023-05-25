@@ -6,36 +6,453 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
-using SevenZip;
-using SevenZip.Sdk.Compression.Lzma;
+using Terminal.Gui;
 
 namespace YuzuEAUpdater
 {
-    internal class Program
+    public class Program
     {
-        private static List<Release> releases = new List<Release>();
-        private static List<PR> prList = new List<PR>();
-
-        private static  string currentVersion = null;
-        private static Release myCurrentRelease = null;
-        private static string currentExe = "yuzu.exe";
-        private static List<Game> games = new List<Game>();
-
-
-
         static void Main(string[] args)
         {
-            getSettings();
-            getCurrentVersion();
-            checkVersion();
-			waitYuzuLaunch();
+
+            Application.Run<UI>();
+            Application.Shutdown();
+
+        }
+    }
+
+    internal class UI : Window
+    {
+        private  List<Release> releases = new List<Release>();
+        private  List<PR> prList = new List<PR>();
+
+        private  string currentVersion = null;
+        private  Release myCurrentRelease = null;
+        private  string currentExe = "yuzu.exe";
+        private  List<Game> games = new List<Game>();
+        public static  Label mainConsole ;
+        private static ProgressBar progressBar ;
+        private static ListView listView;
+        private  Boolean _waitInput = false;
+        private string _input = "";
+        private static List<int> linesIndex = new List<int>();
+        private bool autoStartYuzu;
+        private bool confirmDownload;
+        private static object lockObj = new object();
+        private static bool checkall = false;
+
+
+        public async Task<string> waitInput()
+        {
+            addTextConsole("\n");
+            _waitInput = true;
+            while (_waitInput)
+            {
+              await Task.Delay(100);
+            }
+            var temp = _input;
+            _input = "";
+            return temp;
         }
 
-        private static void killYuzus()
+        public static void addTextConsole(String text)
+        {
+            int[] indexs = text.Select((b, i) => b == '\n' ? i + mainConsole.Text.Length : -1).Where(i => i != -1).ToArray();
+            linesIndex.AddRange(indexs);
+            mainConsole.Text += (text);
+
+            
+               
+            if(mainConsole.SuperView.Bounds.Height>0)
+            {
+                while (linesIndex.Count > 0 && (mainConsole.Frame.Bottom) > mainConsole.SuperView.Bounds.Height)
+                {
+                    var index = linesIndex.First();
+                    if(index < mainConsole.Text.Length)
+                        mainConsole.Text = mainConsole.Text.Substring(index);
+                    else
+                        mainConsole.Text = "";
+
+                    linesIndex.RemoveAt(0);
+
+                    foreach(var l in linesIndex.ToList())
+                    {
+                        linesIndex[linesIndex.IndexOf(l)] = l - index;
+                    }
+
+                }
+            }
+
+            Application.MainLoop.Invoke(() =>
+            {
+                mainConsole.SetNeedsDisplay();
+            });
+        } 
+
+
+        private void InitializeComponent()
+        {
+   
+            Title = "YuzuTool 1.8";
+            this.AutoSize = true;
+            X = 0;
+            Y = 1;
+            Width = Dim.Fill();
+            Height = Dim.Fill();
+
+            MenuBar = new MenuBar();
+            FrameView mainFram = new FrameView();
+            FrameView switchFram = new FrameView();
+            FrameView modFram = new FrameView();
+            List<MenuBarItem> items = new List<MenuBarItem>();
+            listView = new ListView()
+            {
+                X = 1,
+                Y = 2,
+                Height = Dim.Fill(),
+                Width = Dim.Fill(1),
+                //ColorScheme = Colors.TopLevel,
+                AllowsMarking = true,
+                AllowsMultipleSelection = true
+            };
+
+            Label labelFoundMods = new Label();
+            labelFoundMods.X = 1;
+            labelFoundMods.Y = 1;
+            labelFoundMods.Text = "";
+            Button btnDownloadMods = new Button("Install");
+            btnDownloadMods.Visible = false;
+            btnDownloadMods.X = Pos.Percent(60);
+            btnDownloadMods.Y = 1;
+            Button chkAll = new Button("Check All");
+            chkAll.X = Pos.Right(btnDownloadMods) + 1;
+            chkAll.Y = 1;
+            chkAll.Visible = false;
+            chkAll.Clicked += () =>
+            {
+                if (listView.Source== null)
+                    return;
+                var i = 0;
+                foreach (var mod in listView.Source.ToList())
+                {
+                    listView.Source.SetMark(i, !checkall);
+                    i++;
+                }
+
+                checkall = !checkall;
+                if(checkall)
+                    chkAll.Text = "Uncheck All";
+                else
+                    chkAll.Text = "Check All";
+            };
+            Task modsTask = null;
+            btnDownloadMods.Clicked += () =>
+            {
+                if (listView.Source.Count == 0 || (modsTask != null && !modsTask.IsCompleted)  )
+                    return;
+
+                List<BananaMod> mods = listView.Source.ToList() as List<BananaMod>;
+                modsTask = new Task(() =>
+                {
+                    List<BananaMod> markedMods = new List<BananaMod>();
+                    var i = 0;
+                    foreach (var mod in mods)
+                    {
+                        if (listView.Source.IsMarked(i))
+                            markedMods.Add(mod);
+                        i++;
+                    }
+
+                    List<Task> tasks = new List<Task>();
+                    var index = 0;
+                    var nbTaskDone = 0;
+                    foreach (BananaMod mod in markedMods)
+                    {
+                        Task task = new Task(() =>
+                        {
+                            mod.download();
+                            mod.extract();
+                            lock (lockObj)
+                            {
+                                nbTaskDone++;
+                                progress.Report((float)nbTaskDone / (float)markedMods.Count);
+                            }
+                        });
+                        tasks.Add(task);
+                        task.Start();
+                        index++;
+
+                        if (index % 3 == 0)
+                            Task.WaitAll(tasks.ToArray());
+
+                    }
+
+                    Task.WaitAll(tasks.ToArray());
+
+                });
+                modsTask.Start();
+            };
+
+
+            var autoStartItem= new MenuItem("AutoStart Yuzu", null,null, null, null, Key.Null);
+           Action autoStartAction = () =>
+           {
+             autoStartItem.Checked = !autoStartItem.Checked;
+             this.autoStartYuzu = autoStartItem.Checked;
+             setSettings();
+           };
+            autoStartItem.Action = autoStartAction;
+            autoStartItem.Checked = this.autoStartYuzu;
+
+
+            var confirmDownload = new MenuItem("Ask download", null, null, null,null, Key.Null);
+            Action actionConfirmD = () =>
+            {
+                confirmDownload.Checked = !confirmDownload.Checked;
+                this.confirmDownload = confirmDownload.Checked;
+                setSettings();
+            };
+            confirmDownload.Action = actionConfirmD;
+            confirmDownload.Checked = this.confirmDownload;
+
+            autoStartItem.CheckType = MenuItemCheckStyle.Checked;
+            confirmDownload.CheckType = MenuItemCheckStyle.Checked;
+
+
+            items.Add(new MenuBarItem("Settings", new MenuItem[]
+            {autoStartItem,
+            confirmDownload
+            }));
+
+
+
+            Add(MenuBar);
+            MenuBar.Menus = items.ToArray();
+            Task t = new Task(() =>
+            {
+                scanTitlesIdAndGetName();
+                if (this.games.Count > 0)
+                    items.Add(new MenuBarItem("Mods", this.games.Select(g => new MenuItem(g.name, null, () =>
+                    {
+                        Task task = new Task(() =>
+                        {
+                            g.loadMods(this.progress);
+                            modFram.Title = "Mods for " + g.name;
+                            labelFoundMods.Text = g.validBananaMods.Count + " mods found";
+                            listView.SetSource(g.validBananaMods);
+                            btnDownloadMods.Visible = true;
+                            chkAll.Visible = true;
+                        });
+                         task.Start();
+                    }, null, null, Key.Null)).ToArray()));
+                else
+                    items.Add(new MenuBarItem("Mods", new MenuItem[] { new MenuItem("No game found", null, null, null, null, Key.Null) }));
+                MenuBar.Menus = items.ToArray();
+            });
+
+            t.Start();
+
+          
+            mainFram.X = 0;
+            mainFram.Y = 1;
+            mainFram.Width = Dim.Fill();
+            mainFram.Height = Dim.Percent(49);
+            mainFram.Title = "Logs";
+            mainConsole = new Label();
+            mainConsole.X = 0;
+            mainConsole.Y = 0;
+            mainFram.Add(mainConsole);
+            progressBar = new ProgressBar();
+            progressBar.X = 0;
+            progressBar.Y = 0;
+            progressBar.Width = Dim.Fill();
+            progressBar.Height = 1;
+            progressBar.Visible = false;
+            Add(mainFram);
+
+            switchFram.Title = "Switch build";
+            switchFram.X = 0;
+            switchFram.Y = Pos.Percent(51);
+            switchFram.Width = Dim.Percent(17);
+            switchFram.Height = Dim.Percent(49);
+            Label switchLabel = new Label();
+            switchLabel.X = 0;
+            switchLabel.Y = 0;
+            switchLabel.Width = Dim.Fill();
+            switchLabel.Height = 2;
+            switchLabel.Text = "Enter build number: ";
+            switchFram.Add(switchLabel);
+            TextField textField = new TextField();
+            textField.TextChanging += (args) =>
+            {
+                if (args.NewText.Any(c => !char.IsDigit((char)c) && !char.IsControl((char)c)))
+                    args.Cancel = true;
+            };
+            textField.X = 0;
+            textField.Y = 2;
+            textField.Width = Dim.Percent(80);
+            textField.Height = 1;
+            textField.Text = "";
+            switchFram.Add(textField);
+            Button button = new Button("Install");
+            button.X = 0;
+            button.Y = Pos.Bottom(textField)+1;
+            button.Width = Dim.Percent(50);
+            button.Height = 1;
+            button.Clicked +=  () =>
+            {
+                Task t = null;
+                if (textField.Text.Length > 0  && (t == null || t.IsCompleted))
+                {
+                   t= new Task(() =>
+                    {
+                        downloadRelease(new Release(textField.Text.ToString(), true));
+                    });
+                    t.Start();
+                }
+            };
+            switchFram.Add(button);
+
+            modFram.Title = "Mods";
+            modFram.X = Pos.Percent(18);
+            modFram.Y = Pos.Percent(51);
+            modFram.Width = Dim.Fill();
+            modFram.Height = Dim.Percent(49);
+            modFram.Visible = true;
+            modFram.Add(labelFoundMods);
+            modFram.Add(listView);
+            modFram.Add(btnDownloadMods);
+            modFram.Add(chkAll);
+
+
+            listView.RowRender += ListView_RowRender;
+
+            var _scrollBar = new ScrollBarView(listView, true);
+
+            _scrollBar.ChangedPosition += () => {
+                listView.TopItem = _scrollBar.Position;
+                if (listView.TopItem != _scrollBar.Position)
+                {
+                    _scrollBar.Position = listView.TopItem;
+                }
+                listView.SetNeedsDisplay();
+            };
+
+            _scrollBar.OtherScrollBarView.ChangedPosition += () => {
+                listView.LeftItem = _scrollBar.OtherScrollBarView.Position;
+                if (listView.LeftItem != _scrollBar.OtherScrollBarView.Position)
+                {
+                    _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
+                }
+                listView.SetNeedsDisplay();
+            };
+
+            listView.DrawContent += (e) => {
+                if(listView.Source != null)
+                {
+                    _scrollBar.Size = listView.Source.Count - 1;
+                    _scrollBar.Position = listView.TopItem;
+                    _scrollBar.OtherScrollBarView.Size = listView.Maxlength - 1;
+                    _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
+                    _scrollBar.Refresh();
+                }
+            };
+
+
+            Add(switchFram);
+            Add(modFram);
+            Add(progressBar);
+            Application.RootKeyEvent += Application_RootKeyEvent;
+            Application.Init();
+
+
+            Application.MainLoop.Invoke(() =>
+            {
+                Console.SetWindowSize(800, 600);
+                this.SetNeedsDisplay();
+            });
+
+        }
+
+        private void ListView_RowRender(ListViewRowEventArgs obj)
+        {
+            if (obj.Row == listView.SelectedItem)
+            {
+                return;
+            }
+            if (listView.AllowsMarking && listView.Source.IsMarked(obj.Row))
+            {
+                obj.RowAttribute = new Terminal.Gui.Attribute(Color.BrightRed, Color.BrightYellow);
+                return;
+            }
+            if (obj.Row % 2 == 0)
+            {
+                obj.RowAttribute = new Terminal.Gui.Attribute(Color.BrightGreen, Color.Magenta);
+            }
+            else
+            {
+                obj.RowAttribute = new Terminal.Gui.Attribute(Color.BrightMagenta, Color.Green);
+            }
+        }
+
+        private bool Application_RootKeyEvent(KeyEvent arg)
+        {
+            if (_waitInput && mainConsole.SuperView.SuperView.Visible)
+            {
+                if (arg.Key == Key.Enter)
+                {
+                    _waitInput = false;
+                    addTextConsole("\n");
+                }
+                else if (arg.Key == Key.DeleteChar || arg.Key == Key.Backspace)
+                {
+                    if (_input.Length >= 1)
+                    {
+                        mainConsole.Text = mainConsole.Text.Substring(0, mainConsole.Text.Length - 1);
+                        _input = _input.Substring(0, _input.Length - 1);
+                    }
+
+                }
+                else if (!char.IsControl((char)arg.Key))
+                {
+
+                    addTextConsole(((char)arg.Key).ToString());
+                    _input += ((char)arg.Key).ToString();
+
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public  UI()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    getSettings();
+                    InitializeComponent();
+                    getCurrentVersion();
+                    checkVersion();
+                    waitYuzuLaunch();
+                }
+                catch (Exception ex)
+                {
+                    addTextConsole(ex.Message);
+                    addTextConsole(ex.StackTrace);
+                }
+           
+            });
+
+        }
+
+        private  void killYuzus()
         {
             Process[] processes = new Process[0];
 
@@ -45,7 +462,7 @@ namespace YuzuEAUpdater
                 processes = Process.GetProcessesByName("yuzu");
 
             if (processes.Length > 0)
-                Console.WriteLine("Kill yuzu process");
+                addTextConsole("Kill yuzu process\n");
 
             foreach (Process p in processes)
             {
@@ -53,9 +470,20 @@ namespace YuzuEAUpdater
             }
         }
 		
-		private static void waitYuzuLaunch(){
+		private  void waitYuzuLaunch(){
 
-            Console.Write("Starting Yuzu...");
+            while (!autoStartYuzu)
+            {
+                System.Threading.Thread.Sleep(1000);
+            }
+
+            if(!System.IO.File.Exists(currentExe))
+            {
+                addTextConsole("Yuzu not found\n");
+                return;
+            }
+
+            addTextConsole("Starting Yuzu...\n");
             Process p = new Process();
             p.StartInfo.FileName = currentExe;
             p.StartInfo.UseShellExecute = false;
@@ -69,23 +497,41 @@ namespace YuzuEAUpdater
 				Console.Write(".");
                 p = Process.GetProcessById(p.Id);
             }
-
+            
             System.Environment.Exit(0);
-		}
+            Application.Shutdown();
+        
 
-        private static void getSettings()
+        }
+
+        private  void getSettings()
         {
+            string[] data =  new string[0];
             if (System.IO.File.Exists("launchUpdater.txt"))
             {
                 StreamReader reader = new StreamReader("launchUpdater.txt");
-                currentExe = reader.ReadToEnd().Replace("\r\n", "");
+                 data = reader.ReadToEnd().Replace("\r\n", "").Split("|");
                 reader.Close();
             }
+
+
+            if (data.Length > 0)
+                currentExe = data[0];
+
+            autoStartYuzu = data.Length > 1 ? bool.Parse(data[1]) : true;
+            confirmDownload = data.Length > 2 ? bool.Parse(data[2]) : true;
 
             Utils.init7ZipPaht();
         }
 
-        private static HttpClient httpClient()
+        private void setSettings()
+        {
+            StreamWriter writer = new StreamWriter("launchUpdater.txt");
+            writer.Write(currentExe + "|" + autoStartYuzu + "|" + confirmDownload);
+            writer.Close();
+        }
+
+        private  HttpClient httpClient()
         {
 
             HttpClientHandler httpClientHandler = new HttpClientHandler();
@@ -96,7 +542,7 @@ namespace YuzuEAUpdater
             return client ;
         }
 
-        static void getCurrentVersion()
+         void getCurrentVersion()
         {
             try
             {
@@ -109,7 +555,7 @@ namespace YuzuEAUpdater
                         currentExe = files.First();
                         currentVersion = currentExe.Substring(currentExe.LastIndexOf("-") + 1, currentExe.LastIndexOf(".") - currentExe.LastIndexOf("-") - 1);
                         currentVersion = "EA-" + currentVersion;
-                        Console.WriteLine("Yuzu EA version found : " + currentVersion);
+                        addTextConsole("Yuzu EA version found : " + currentVersion + "\n");
                     }
                 }
                 else
@@ -125,24 +571,24 @@ namespace YuzuEAUpdater
                             currentVersion = currentVersion.Substring(1);
 
                         currentVersion = "EA-" + currentVersion;
-                        Console.WriteLine("Yuzu EA version found : " + currentVersion);
+                        addTextConsole("Yuzu EA version found : " + currentVersion + "\n");
                     }
                 }
             }
             catch(ArgumentOutOfRangeException e) 
             { 
-                Console.WriteLine("Its seem you dont use EA Yuzu version.");
-                Console.WriteLine("You must use EA version from pineapple here : https://github.com/pineappleEA/pineapple-src/releases.");
+                addTextConsole("Its seem you dont use EA Yuzu version." + "\n");
+                addTextConsole("You must use EA version from pineapple here : https://github.com/pineappleEA/pineapple-src/releases." + "\n");
             }
 
 
 
         }
 
-        public static void checkVersion()
+        public  void checkVersion()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-            Console.WriteLine("Check for YUZU EA update");
+            addTextConsole("Check for YUZU EA update" + "\n");
 
 
             String src =  httpClient().GetAsync("https://github.com/pineappleEA/pineapple-src/releases/").Result.Content.ReadAsStringAsync().Result;
@@ -155,7 +601,7 @@ namespace YuzuEAUpdater
             }
 
             if(currentVersion == null)
-                Console.WriteLine("No version found");
+                addTextConsole("No version found" + "\n");
             
             myCurrentRelease = releases.Where(x => x.version == currentVersion).FirstOrDefault();
             if(myCurrentRelease == null)
@@ -163,9 +609,10 @@ namespace YuzuEAUpdater
             
             if (myCurrentRelease != releases.FirstOrDefault())
             {
-                Console.WriteLine("Retrieve PRs from github");
+                addTextConsole("Retrieve PRs from github" + "\n");
                 for (var p = 0; p < 4; p++)
                 {
+                    progress.Report((p + 1) * 0.25f);
                     src = httpClient().GetAsync("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc").Result.Content.ReadAsStringAsync().Result;
 
                     string[] prs = src.Split(new String[] { "<div class=\"flex-auto min-width-0 p-2 pr-3 pr-md-2\">" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
@@ -183,58 +630,36 @@ namespace YuzuEAUpdater
 
                 string changeLog = getChangeLog();
 
-                Console.WriteLine("New Version found , pass from " + currentVersion + " to " + releases[0].version + "\n" + getChangeLog());
-                Console.WriteLine("Do you want to download it ? (y/n)");
-                string answer = Console.ReadLine();
-                if (answer == "y")
+                addTextConsole("New Version found , pass from " + currentVersion + " to " + releases[0].version + "\n" + getChangeLog());
+                if(confirmDownload)
                 {
-                    downloadRelease(releases[0]);
+                    addTextConsole("Do you want to download it ? (y/n)" + "\n");
+                    string answer = waitInput().Result;
+                    if (answer != "y")
+                        return;
                 }
-
+                 downloadRelease(releases[0]);
             }
             else
             {
-                Console.WriteLine("Yuzu is up to date");
+                addTextConsole("Yuzu is up to date" + "\n");
             }
-            
-            
 
-            while (true)
-            {
-                Console.WriteLine();
-                Console.WriteLine("Do you want another things ?");
-                Console.WriteLine("-switch <buildID>");
-                Console.WriteLine("-dmods (Download all available mods in gamebanana)");
-                Console.WriteLine("-Nothing , launch yuzu");
-                String input = Console.ReadLine();
-                Console.WriteLine();
-                var buildId = Regex.Match(input, @"-switch (\d+)").Groups[1].Value;
-                if (buildId != "")
-                {
-                    downloadRelease(new Release(buildId, true));
-                }
-                else if(input == "-dmods")
-                {
-                    downloadMods();
-                }
-                else
-                    return;
-            }
         }
 
-        private static  void  downloadRelease(Release release)
+        private void  downloadRelease(Release release)
         {
 			try{
                 killYuzus();
-                Console.WriteLine("Downloading "+ release.version + " version");
+                addTextConsole("Downloading "+ release.version + " version" + "\n");
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     String fileName = System.IO.Path.GetFileName(new Uri(release.downloadUrl).LocalPath);
-                    download(release.downloadUrl, fileName);
-                    Console.WriteLine("Make executable");
+                    download(release.downloadUrl, fileName).GetAwaiter().GetResult();
+                    addTextConsole("Make executable" + "\n");
                     Process.Start("chmod", "+x " + fileName);
-                    Console.WriteLine("Remove old version");
+                    addTextConsole("Remove old version" + "\n");
                     if (System.IO.File.Exists(currentExe))
                         System.IO.File.Delete(currentExe);
 
@@ -242,14 +667,14 @@ namespace YuzuEAUpdater
                 }
                 else
                 {
-                    download(release.downloadUrl, "YuzuEA.zip");
+                    download(release.downloadUrl, "YuzuEA.zip").GetAwaiter().GetResult();
                     ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
                     zip.ExtractToDirectory(System.Environment.CurrentDirectory, true);
                     zip.Dispose();
-                    Console.WriteLine("Remove zip file");
+                    addTextConsole("Remove zip file" + "\n");
                     System.IO.File.Delete("YuzuEA.zip");
                     string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
-                    Console.WriteLine("Move files and directory to root directory");
+                    addTextConsole("Move files and directory to root directory" + "\n");
                     if (System.IO.File.Exists(currentExe))
                         System.IO.File.Delete(currentExe);
                     Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
@@ -257,12 +682,12 @@ namespace YuzuEAUpdater
                 }
 			}
 			catch(Exception ex){
-				Console.WriteLine(ex.StackTrace + "  " + ex.Message);
+				addTextConsole(ex.StackTrace + "  " + ex.Message + "\n");
 				Console.ReadLine();
 			}
         }
 
-        private static string getChangeLog()
+        private  string getChangeLog()
         {
             string changeLog = "";
             List<PR> prs = prList.Where(x => x.releaseDate > myCurrentRelease.releaseDate  && x.label.Contains("merge")).ToList();
@@ -274,88 +699,45 @@ namespace YuzuEAUpdater
             return changeLog;
         }
 
-        private static void download(String uri,String filename)
+        private async Task download(String uri,String filename)
         {
             HttpClient _httpClient = httpClient();
             _httpClient.BaseAddress = new Uri(uri);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
-            HttpResponseMessage response = _httpClient.GetAsync(uri).Result;
-            response.EnsureSuccessStatusCode();
-            using (FileStream fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var file = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                response.Content.CopyToAsync(fileStream).Wait();
+
+                await _httpClient.DownloadAsync(uri, file, progress);
             }
+
         }
 
-
-        private static void downloadMods()
+        private IProgress<float> progress
         {
-            scanTitlesIdAndGetName();
-            if (games.Count == 0)
+            get; set; 
+        
+        } = new Progress<float>(p => {
+            if(progressBar.Visible == false)
             {
-                Console.WriteLine("No game found");
-                return;
+                progressBar.Y = progressBar.SuperView.Bounds.Bottom - 1;
+                progressBar.Visible = true;
             }
-            else
-            {
-                Console.WriteLine("Select game to download mods");
-                String input = Console.ReadLine();
-                int index = 0;
-                if (int.TryParse(input, out index))
-                {
-                    if (index < games.Count)
-                    {
-                        Game game = games[index];
-                        game.loadMods();
 
-                        List<BananaMod> validMods = game.bananaMods.Where(x => x._sModelName == "Mod" && !x._bIsObsolete && x._bHasFiles).ToList();
-                        Console.WriteLine("Find " + validMods.Count + " mods for " + game.name);
-                        Console.WriteLine("Download all mods ? (y/n)");
-                        input = Console.ReadLine();
-                        if (input == "y")
-                        {
-                            List<Task> tasks = new List<Task>();
-                            index = 0;
-                            foreach (BananaMod mod in validMods)
-                            {
-                                Task task = new Task(() =>
-                                {
-                                    mod.download();
-                                    mod.extract(game.pathMods);
-                                });
-                                tasks.Add(task);
-                                task.Start();
-                                index++;
+            progressBar.Fraction = p;
 
-                                if(index % 3 == 0)
-                                 Task.WaitAll(tasks.ToArray());
+            if(p==1)
+            progressBar.Visible = false;
 
-                            }
-
-                            Task.WaitAll(tasks.ToArray());
-                            
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("Invalid index");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("Invalid index");
-                }
-            }
-        }
+            });
 
 
-        private static void scanTitlesIdAndGetName()
+
+        private  void scanTitlesIdAndGetName()
         {
             if (games.Count == 0)
             {
-                Console.WriteLine("");
-                Console.WriteLine("Scanning game");
+
                 var path = System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/yuzu";
 
                 if(!Directory.Exists(path))
@@ -377,7 +759,6 @@ namespace YuzuEAUpdater
                     if (name != "")
                     {
                         games.Add(new Game(id, name,path));
-                        Console.WriteLine(games.Count-1 + ")  " + name);
                     }
 
                 }
@@ -390,253 +771,4 @@ namespace YuzuEAUpdater
     }
 
 
-    public class Release
-    {
-        public Release(string releaseVersion)
-        {
-
-            this.version = Regex.Match(releaseVersion, @""">(.*)</h2>").Groups[1].Value;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Linux-Yuzu-" + this.version + ".AppImage";
-            else
-                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
-           
-
-            this.releaseDate = DateTime.Parse(Regex.Match(releaseVersion, @"datetime=""(.*)"">").Groups[1].Value);
-
-        }
-
-        public Release(string version,bool none)
-        {
-            if(version == null)
-            {
-                this.version = "EA-0";
-            }
-            else
-            {
-                this.version = "EA-" + version;
-            }
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Linux-Yuzu-" + this.version + ".AppImage";
-            else
-                this.downloadUrl = @"https://github.com/pineappleEA/pineapple-src/releases/download/" + this.version + "/Windows-Yuzu-" + this.version + ".zip";
-
-            this.releaseDate = DateTime.MinValue;
-        }
-
-        public string version;
-        public string downloadUrl;
-        public DateTime releaseDate;
-    }
-
-    public class PR
-    {
-        public PR(string prVersion)
-        {
-             idIssue = Regex.Match(prVersion, @"<a id=""issue_(\d*)_link").Groups[1].Value;
-             description = Regex.Match(prVersion, @"<a id=""issue_\d*_link"".*>(.*)</a>").Groups[1].Value;
-             releaseDate = DateTime.Parse(Regex.Match(prVersion, @"datetime=""(.*)Z""").Groups[1].Value + "Z");
-
-            var labels = Regex.Matches(prVersion, @"data-name=""(.*)"" style=");
-            foreach(Match label in labels)
-            {
-                this.label += label.Groups[1].Value + " ";
-            }
-        }
-
-        public string idIssue;
-        public string description;
-        public DateTime releaseDate;
-        public string label = "";
-
-    }
-
-
-    public class Game
-    {
-        public string id;
-        public string name;
-        public string pathApp;
-        public List<BananaMod> bananaMods = new List<BananaMod>();
-
-        public string pathMods
-        {
-            get
-            {
-                return pathApp + "\\load\\" + this.id;
-            }
-        }
-
-        public Game(string id, string name, string pathApp)
-        {
-            this.id = id;
-            this.name = name;
-            this.pathApp = pathApp;
-        }
-
-        public void loadMods()
-        {
-            if (bananaMods.Count == 0)
-            {
-                HttpClient _httpClient = new HttpClient();
-
-                String src = _httpClient.GetAsync("https://gamebanana.com/apiv11/Util/Game/NameMatch?_sName=" + name.Replace(" ", "+") + "&_nPerpage=10&_nPage=1").Result.Content.ReadAsStringAsync().Result;
-                String idGameBanana = Regex.Match(src, @"""_idRow"": (\d+)").Groups[1].Value;
-                BananaResponse bananaResponse = null;
-                int p = 1;
-                while (bananaResponse == null || bananaResponse._aRecords.Count > 0)
-                {
-                    src = _httpClient.GetAsync("https://gamebanana.com/apiv11/Game/" + idGameBanana + "/Subfeed?_nPage=" + p + "&_sSort=default").Result.Content.ReadAsStringAsync().Result;
-                    bananaResponse = JsonSerializer.Deserialize<BananaResponse>(src);
-                    bananaMods.AddRange(bananaResponse._aRecords);
-                    p++;
-                }
-            }
-        }
-    }
-
-
-    public class BananaResponse
-    {
-        public List<BananaMod> _aRecords { get; set; }
-
-    }
-
-    public class BananaFile
-    {
-        public int _idRow { get; set; }
-        public string _sFile { get; set; }
-        public int _nFilesize { get; set; }
-        public string _sDescription { get; set; }
-        public long _tsDateAdded { get; set; }
-        public int _nDownloadCount { get; set; }
-        public string _sAnalysisState { get; set; }
-        public string _sDownloadUrl { get; set; }
-        public string _sMd5Checksum { get; set; }
-        public string _sClamAvResult { get; set; }
-        public string _sAnalysisResult { get; set; }
-        public bool _bContainsExe { get; set; }
-
-    }
-
-    public class BananaMod
-    {
-        public int _idRow { get; set; }
-        public string _sModelName { get; set; }
-        public string _sSingularTitle { get; set; }
-        public string _sIconClasses { get; set; }
-        public string _sName { get; set; }
-        public string _sProfileUrl { get; set; }
-        public long _tsDateAdded { get; set; }
-        public long _tsDateModified { get; set; }
-        public bool _bHasFiles{ get; set; }
-        public string[] _aTags{ get; set; }
-        public string _sVersion{ get; set; }
-        public long _tsDateUpdated { get; set; }
-        public bool _bIsObsolete{ get; set; }
-        public string _sInitialVisibility{ get; set; }
-        public bool _bHasContentRatings{ get; set; }
-        public int _nLikeCount { get; set; }
-        public int _nPostCount { get; set; }
-        public bool _bWasFeatured{ get; set; }
-        public int _nViewCount { get; set; }
-        public bool _bIsOwnedByAccessor{ get; set; }
-
-        public List<BananaFile> files;
-
-
-        public void loadFiles()
-        {
-            HttpClient _httpClient = new HttpClient();
-            String uri = "https://gamebanana.com/apiv11/Mod/" + _idRow + "/Files";
-            String src = _httpClient.GetAsync(uri).Result.Content.ReadAsStringAsync().Result;
-            files = JsonSerializer.Deserialize<List<BananaFile>>(src);
-
-        }
-
-        public void download()
-        {
-            if(!Directory.Exists("_tempMod"))
-            {
-                Directory.CreateDirectory("_tempMod");
-            }
-
-            if(files == null) 
-                loadFiles();
-
-            foreach (BananaFile file in files)
-            {
-                if (file._sClamAvResult == "clean")
-                {
-                    using (var client = new WebClient())
-                    {
-                        if(file._sFile.EndsWith(".zip") || file._sFile.EndsWith(".7z"))
-                        {
-                            Console.WriteLine("       -Downloading " + file._sFile);
-                            if (System.IO.File.Exists("_tempMod/" + file._sFile))
-                            {
-                                System.IO.File.Delete("_tempMod/" + file._sFile);
-                            }
-
-                            try
-                            {
-                                client.DownloadFile(file._sDownloadUrl, "_tempMod/" + file._sFile);
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine("Error while downloading " + file._sFile + " : " + e.Message);
-                            }
-                        }
-                    }
-                }
-            }
-
-        }
-
-        public void extract(String pathToExtract)
-        {
-
-            foreach (BananaFile f in files)
-            {
-                if (f._sFile.EndsWith(".zip") || f._sFile.EndsWith(".7z"))
-                {
-                    Console.WriteLine("       -Extracting " + f._sFile);
-                    try
-                    {
-                        if (f._sFile.EndsWith(".zip"))
-                        {
-                            ZipArchive zipArchive = ZipFile.OpenRead("_tempMod/" + f._sFile);
-                            bool isCorrectModFolder = zipArchive.Entries.ToList().FirstOrDefault(f => f.FullName.Contains("romfs") || f.FullName.Contains("exefs") || f.FullName.Contains("cheats")) != null;
-                            if(isCorrectModFolder)
-                                ZipFile.ExtractToDirectory("_tempMod/" + f._sFile, pathToExtract,true);
-
-                            zipArchive.Dispose();
-                        }
-                        else
-                        {
-                            SevenZipExtractor extractor = new SevenZipExtractor("_tempMod/" + f._sFile);
-                            bool isCorrectModFolder = extractor.ArchiveFileNames.ToList().FirstOrDefault(f => f.Contains("romfs") || f.Contains("exefs") || f.Contains("cheats")) != null;
-                            if (isCorrectModFolder)
-                                extractor.ExtractArchive(pathToExtract);
-
-                            extractor.Dispose();
-                        }
-                        System.Threading.Thread.Sleep(1000);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("Error while extracting " + f._sFile + " : " + e.Message);
-                    }
-                    finally
-                    {
-                        if (System.IO.File.Exists("_tempMod/" + f._sFile))
-                        {
-                            System.IO.File.Delete("_tempMod/" + f._sFile);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
