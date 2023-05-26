@@ -62,6 +62,9 @@ namespace YuzuEAUpdater
 
         public static void addTextConsole(String text)
         {
+            if (mainConsole == null)
+                return;
+
             int[] indexs = text.Select((b, i) => b == '\n' ? i + mainConsole.Text.Length : -1).Where(i => i != -1).ToArray();
             linesIndex.AddRange(indexs);
             mainConsole.Text += (text);
@@ -373,7 +376,7 @@ namespace YuzuEAUpdater
 
             Application.MainLoop.Invoke(() =>
             {
-                Console.SetWindowSize(800, 600);
+
                 this.SetNeedsDisplay();
             });
 
