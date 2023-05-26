@@ -441,11 +441,22 @@ namespace YuzuEAUpdater
                     getCurrentVersion();
                     checkVersion();
                     waitYuzuLaunch();
+
                 }
                 catch (Exception ex)
                 {
-                    addTextConsole(ex.Message);
-                    addTextConsole(ex.StackTrace);
+ 
+                    try
+                    {
+                        addTextConsole(ex.Message);
+                        addTextConsole(ex.StackTrace);
+                    }
+                    catch(Exception ex2)
+                    {
+                        Application.Shutdown();
+                        Console.Write(ex.StackTrace);
+                        Console.ReadLine();
+                    }
                 }
            
             });

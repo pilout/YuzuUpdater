@@ -31,7 +31,7 @@ namespace YuzuEAUpdater
         {
             this.id = id;
             this.name = name;
-            this.pathApp = pathApp;
+            this.pathApp = pathApp + "\\load\\" + id + "\\";
         }
 
         public void loadMods(IProgress<float> progess =  null)
@@ -40,7 +40,7 @@ namespace YuzuEAUpdater
             {
                 HttpClient _httpClient = new HttpClient();
 
-                String src = _httpClient.GetAsync("https://gamebanana.com/apiv11/Util/Game/NameMatch?_sName=" + name.Replace(" ", "+") + "&_nPerpage=10&_nPage=1").Result.Content.ReadAsStringAsync().Result;
+                String src = _httpClient.GetAsync("https://gamebanana.com/apiv11/Util/Game/NameMatch?_sName=" + name.Replace(" ", "+").Replace("™","") + "&_nPerpage=10&_nPage=1").Result.Content.ReadAsStringAsync().Result;
                 String idGameBanana = Regex.Match(src, @"""_idRow"": (\d+)").Groups[1].Value;
                 BananaResponse bananaResponse = null;
                 int p = 1;
