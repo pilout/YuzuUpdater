@@ -471,6 +471,7 @@ namespace YuzuEAUpdater
         }
 		
 		private  void waitYuzuLaunch(){
+            var timer = 10000;
 
             while (!autoStartYuzu)
             {
@@ -491,9 +492,10 @@ namespace YuzuEAUpdater
             p.StartInfo.RedirectStandardError = true;
             p.Start();
 			
-			while(p.MainWindowHandle==IntPtr.Zero && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+			while(p.MainWindowHandle==IntPtr.Zero && RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ||( timer > 0))
             {
 				System.Threading.Thread.Sleep(1000);
+                timer -= 1000;
 				Console.Write(".");
                 p = Process.GetProcessById(p.Id);
             }
