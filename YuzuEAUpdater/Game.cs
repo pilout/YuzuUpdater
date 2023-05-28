@@ -24,7 +24,11 @@ namespace YuzuEAUpdater
         }
 
 
-        public List<BananaMod> validBananaMods => bananaMods.Where(x => x._sModelName == "Mod" && !x._bIsObsolete && x._bHasFiles).ToList();
+
+
+        public List<BananaMod> validBananaMods => bananaMods.Where(x => x._sModelName == "Mod" && !x._bIsObsolete && x._bHasFiles)
+            .OrderBy(x => x._sName.ToLower())
+            .OrderByDescending(x => x._nLikeCount).ToList();
  
 
         public Game(string id, string name, string pathApp)
@@ -42,6 +46,10 @@ namespace YuzuEAUpdater
 
                 String src = _httpClient.GetAsync("https://gamebanana.com/apiv11/Util/Game/NameMatch?_sName=" + name.Replace(" ", "+").Replace("™","") + "&_nPerpage=10&_nPage=1").Result.Content.ReadAsStringAsync().Result;
                 String idGameBanana = Regex.Match(src, @"""_idRow"": (\d+)").Groups[1].Value;
+
+                if (idGameBanana == "")
+                    return;
+
                 BananaResponse bananaResponse = null;
                 int p = 1;
                 while (bananaResponse == null || bananaResponse._aRecords.Count > 0)

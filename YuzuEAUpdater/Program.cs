@@ -6,10 +6,8 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using Terminal.Gui;
 
@@ -43,8 +41,10 @@ namespace YuzuEAUpdater
         private static List<int> linesIndex = new List<int>();
         private bool autoStartYuzu;
         private bool confirmDownload;
+        private bool backupSave = false;
         private static object lockObj = new object();
         private static bool checkall = false;
+        private string pathApp = "";
 
 
         public async Task<string> waitInput()
@@ -62,321 +62,336 @@ namespace YuzuEAUpdater
 
         public static void addTextConsole(String text)
         {
-            if (mainConsole == null)
-                return;
 
             int[] indexs = text.Select((b, i) => b == '\n' ? i + mainConsole.Text.Length : -1).Where(i => i != -1).ToArray();
             linesIndex.AddRange(indexs);
-            mainConsole.Text += (text);
-
-            
-               
-            if(mainConsole.SuperView.Bounds.Height>0)
-            {
-                while (linesIndex.Count > 0 && (mainConsole.Frame.Bottom) > mainConsole.SuperView.Bounds.Height)
-                {
-                    var index = linesIndex.First();
-                    if(index < mainConsole.Text.Length)
-                        mainConsole.Text = mainConsole.Text.Substring(index);
-                    else
-                        mainConsole.Text = "";
-
-                    linesIndex.RemoveAt(0);
-
-                    foreach(var l in linesIndex.ToList())
-                    {
-                        linesIndex[linesIndex.IndexOf(l)] = l - index;
-                    }
-
-                }
-            }
 
             Application.MainLoop.Invoke(() =>
             {
-                mainConsole.SetNeedsDisplay();
+                mainConsole.Text += (text);
+
+                if(mainConsole.SuperView.Bounds.Height>0)
+                {
+                    while (linesIndex.Count > 0 && (mainConsole.Frame.Bottom) > mainConsole.SuperView.Bounds.Height)
+                    {
+                        var index = linesIndex.First();
+                        if(index < mainConsole.Text.Length)
+                            mainConsole.Text = mainConsole.Text.Substring(index);
+                        else
+                            mainConsole.Text = "";
+
+                        linesIndex.RemoveAt(0);
+
+                        foreach(var l in linesIndex.ToList())
+                        {
+                            linesIndex[linesIndex.IndexOf(l)] = l - index;
+                        }
+
+                    }
+                }
+
+
+                    mainConsole.SetNeedsDisplay();
             });
         } 
 
-
         private void InitializeComponent()
         {
-   
-            Title = "YuzuTool 1.8";
-            this.AutoSize = true;
-            X = 0;
-            Y = 1;
-            Width = Dim.Fill();
-            Height = Dim.Fill();
-
-            MenuBar = new MenuBar();
-            FrameView mainFram = new FrameView();
-            FrameView switchFram = new FrameView();
-            FrameView modFram = new FrameView();
-            List<MenuBarItem> items = new List<MenuBarItem>();
-            listView = new ListView()
+            Application.MainLoop.Invoke(() =>
             {
-                X = 1,
-                Y = 2,
-                Height = Dim.Fill(),
-                Width = Dim.Fill(1),
-                //ColorScheme = Colors.TopLevel,
-                AllowsMarking = true,
-                AllowsMultipleSelection = true
-            };
+                Title = "YuzuTool 1.8";
+                this.AutoSize = true;
+                X = 0;
+                Y = 1;
+                Width = Dim.Fill();
+                Height = Dim.Fill();
 
-            Label labelFoundMods = new Label();
-            labelFoundMods.X = 1;
-            labelFoundMods.Y = 1;
-            labelFoundMods.Text = "";
-            Button btnDownloadMods = new Button("Install");
-            btnDownloadMods.Visible = false;
-            btnDownloadMods.X = Pos.Percent(60);
-            btnDownloadMods.Y = 1;
-            Button chkAll = new Button("Check All");
-            chkAll.X = Pos.Right(btnDownloadMods) + 1;
-            chkAll.Y = 1;
-            chkAll.Visible = false;
-            chkAll.Clicked += () =>
-            {
-                if (listView.Source== null)
-                    return;
-                var i = 0;
-                foreach (var mod in listView.Source.ToList())
+                MenuBar = new MenuBar();
+                FrameView mainFram = new FrameView();
+                FrameView switchFram = new FrameView();
+                FrameView modFram = new FrameView();
+                List<MenuBarItem> items = new List<MenuBarItem>();
+                listView = new ListView()
                 {
-                    listView.Source.SetMark(i, !checkall);
-                    i++;
-                }
+                    X = 1,
+                    Y = 2,
+                    Height = Dim.Fill(),
+                    Width = Dim.Fill(1),
+                    //ColorScheme = Colors.TopLevel,
+                    AllowsMarking = true,
+                    AllowsMultipleSelection = true
+                };
 
-                checkall = !checkall;
-                if(checkall)
-                    chkAll.Text = "Uncheck All";
-                else
-                    chkAll.Text = "Check All";
-            };
-            Task modsTask = null;
-            btnDownloadMods.Clicked += () =>
-            {
-                if (listView.Source.Count == 0 || (modsTask != null && !modsTask.IsCompleted)  )
-                    return;
-
-                List<BananaMod> mods = listView.Source.ToList() as List<BananaMod>;
-                modsTask = new Task(() =>
+                Label labelFoundMods = new Label();
+                labelFoundMods.X = 1;
+                labelFoundMods.Y = 1;
+                labelFoundMods.Text = "";
+                Button btnDownloadMods = new Button("Install");
+                btnDownloadMods.Visible = false;
+                btnDownloadMods.X = Pos.Percent(60);
+                btnDownloadMods.Y = 1;
+                Button chkAll = new Button("Check All");
+                chkAll.X = Pos.Right(btnDownloadMods) + 1;
+                chkAll.Y = 1;
+                chkAll.Visible = false;
+                chkAll.Clicked += () =>
                 {
-                    List<BananaMod> markedMods = new List<BananaMod>();
+                    if (listView.Source== null)
+                        return;
                     var i = 0;
-                    foreach (var mod in mods)
+                    foreach (var mod in listView.Source.ToList())
                     {
-                        if (listView.Source.IsMarked(i))
-                            markedMods.Add(mod);
+                        listView.Source.SetMark(i, !checkall);
                         i++;
                     }
 
-                    List<Task> tasks = new List<Task>();
-                    var index = 0;
-                    var nbTaskDone = 0;
-                    foreach (BananaMod mod in markedMods)
+                    checkall = !checkall;
+                    if(checkall)
+                        chkAll.Text = "Uncheck All";
+                    else
+                        chkAll.Text = "Check All";
+                };
+                Task modsTask = null;
+                btnDownloadMods.Clicked += () =>
+                {
+                    if (listView.Source.Count == 0 || (modsTask != null && !modsTask.IsCompleted)  )
+                        return;
+
+                    List<BananaMod> mods = listView.Source.ToList() as List<BananaMod>;
+                    modsTask = new Task(() =>
                     {
-                        Task task = new Task(() =>
+                        List<BananaMod> markedMods = new List<BananaMod>();
+                        var i = 0;
+                        foreach (var mod in mods)
                         {
-                            mod.download();
-                            mod.extract();
-                            lock (lockObj)
+                            if (listView.Source.IsMarked(i))
+                                markedMods.Add(mod);
+                            i++;
+                        }
+
+                        List<Task> tasks = new List<Task>();
+                        var index = 0;
+                        var nbTaskDone = 0;
+                        foreach (BananaMod mod in markedMods)
+                        {
+                            Task task = new Task(() =>
                             {
-                                nbTaskDone++;
-                                progress.Report((float)nbTaskDone / (float)markedMods.Count);
-                            }
-                        });
-                        tasks.Add(task);
-                        task.Start();
-                        index++;
+                                mod.download();
+                                mod.extract();
+                                lock (lockObj)
+                                {
+                                    nbTaskDone++;
+                                    progress.Report((float)nbTaskDone / (float)markedMods.Count);
+                                }
+                            });
+                            tasks.Add(task);
+                            task.Start();
+                            index++;
 
-                        if (index % 3 == 0)
-                            Task.WaitAll(tasks.ToArray());
+                            if (index % 3 == 0)
+                                Task.WaitAll(tasks.ToArray());
 
-                    }
+                        }
 
-                    Task.WaitAll(tasks.ToArray());
+                        Task.WaitAll(tasks.ToArray());
 
-                });
-                modsTask.Start();
-            };
-
-
-            var autoStartItem= new MenuItem("AutoStart Yuzu", null,null, null, null, Key.Null);
-           Action autoStartAction = () =>
-           {
-             autoStartItem.Checked = !autoStartItem.Checked;
-             this.autoStartYuzu = autoStartItem.Checked;
-             setSettings();
-           };
-            autoStartItem.Action = autoStartAction;
-            autoStartItem.Checked = this.autoStartYuzu;
+                    });
+                    modsTask.Start();
+                };
 
 
-            var confirmDownload = new MenuItem("Ask download", null, null, null,null, Key.Null);
-            Action actionConfirmD = () =>
-            {
-                confirmDownload.Checked = !confirmDownload.Checked;
-                this.confirmDownload = confirmDownload.Checked;
-                setSettings();
-            };
-            confirmDownload.Action = actionConfirmD;
-            confirmDownload.Checked = this.confirmDownload;
-
-            autoStartItem.CheckType = MenuItemCheckStyle.Checked;
-            confirmDownload.CheckType = MenuItemCheckStyle.Checked;
+                var autoStartItem= new MenuItem("AutoStart Yuzu", null,null, null, null, Key.Null);
+               Action autoStartAction = () =>
+               {
+                 autoStartItem.Checked = !autoStartItem.Checked;
+                 this.autoStartYuzu = autoStartItem.Checked;
+                 setSettings();
+               };
+                autoStartItem.Action = autoStartAction;
+                autoStartItem.Checked = this.autoStartYuzu;
+                autoStartItem.CheckType = MenuItemCheckStyle.Checked;
 
 
-            items.Add(new MenuBarItem("Settings", new MenuItem[]
-            {autoStartItem,
-            confirmDownload
-            }));
+                var confirmDownload = new MenuItem("Ask download", null, null, null,null, Key.Null);
+                Action actionConfirmD = () =>
+                {
+                    confirmDownload.Checked = !confirmDownload.Checked;
+                    this.confirmDownload = confirmDownload.Checked;
+                    setSettings();
+                };
+                confirmDownload.Action = actionConfirmD;
+                confirmDownload.Checked = this.confirmDownload;
+                confirmDownload.CheckType = MenuItemCheckStyle.Checked;
+
+
+                var backupSave = new MenuItem("Backup Save at start", null, null, null, null, Key.Null);
+                Action actionBackupSave = () =>
+                {
+                    backupSave.Checked = !backupSave.Checked;
+                    this.backupSave = backupSave.Checked;
+                    setSettings();
+                };
+                backupSave.Action = actionBackupSave;
+                backupSave.Checked = this.backupSave;
+                backupSave.CheckType = MenuItemCheckStyle.Checked;
 
 
 
-            Add(MenuBar);
-            MenuBar.Menus = items.ToArray();
-            Task t = new Task(() =>
-            {
-                scanTitlesIdAndGetName();
-                if (this.games.Count > 0)
-                    items.Add(new MenuBarItem("Mods", this.games.Select(g => new MenuItem(g.name, null, () =>
-                    {
-                        Task task = new Task(() =>
-                        {
-                            g.loadMods(this.progress);
-                            modFram.Title = "Mods for " + g.name;
-                            labelFoundMods.Text = g.validBananaMods.Count + " mods found";
-                            listView.SetSource(g.validBananaMods);
-                            btnDownloadMods.Visible = true;
-                            chkAll.Visible = true;
-                        });
-                         task.Start();
-                    }, null, null, Key.Null)).ToArray()));
-                else
-                    items.Add(new MenuBarItem("Mods", new MenuItem[] { new MenuItem("No game found", null, null, null, null, Key.Null) }));
+                items.Add(new MenuBarItem("Settings", new MenuItem[]
+                {autoStartItem,
+                confirmDownload,
+                backupSave
+                }));
+
+
+
+                Add(MenuBar);
+                items.Add(new MenuBarItem("_Restore latest backup", null, restoreLatestBackup));
+
                 MenuBar.Menus = items.ToArray();
-            });
+       
 
-            t.Start();
+                Task t = new Task(() =>
+                {
+                    scanTitlesIdAndGetName();
+                    if (this.games.Count > 0)
+                        items.Add(new MenuBarItem("Mods", this.games.Select(g => new MenuItem(g.name, null, () =>
+                        {
+                            Task task = new Task(() =>
+                            {
+                                g.loadMods(this.progress);
+                                modFram.Title = "Mods for " + g.name;
+                                labelFoundMods.Text = g.validBananaMods.Count + " mods found";
+                                listView.SetSource(g.validBananaMods);
+                                btnDownloadMods.Visible = true;
+                                chkAll.Visible = true;
+                            });
+                             task.Start();
+                        }, null, null, Key.Null)).ToArray()));
+                    else
+                        items.Add(new MenuBarItem("Mods", new MenuItem[] { new MenuItem("No game found", null, null, null, null, Key.Null) }));
+                    MenuBar.Menus = items.ToArray();
+                });
+
+                t.Start();
 
           
-            mainFram.X = 0;
-            mainFram.Y = 1;
-            mainFram.Width = Dim.Fill();
-            mainFram.Height = Dim.Percent(49);
-            mainFram.Title = "Logs";
-            mainConsole = new Label();
-            mainConsole.X = 0;
-            mainConsole.Y = 0;
-            mainFram.Add(mainConsole);
-            progressBar = new ProgressBar();
-            progressBar.X = 0;
-            progressBar.Y = 0;
-            progressBar.Width = Dim.Fill();
-            progressBar.Height = 1;
-            progressBar.Visible = false;
-            Add(mainFram);
+                mainFram.X = 0;
+                mainFram.Y = 1;
+                mainFram.Width = Dim.Fill();
+                mainFram.Height = Dim.Percent(49);
+                mainFram.Title = "Logs";
+                mainConsole = new Label();
+                mainConsole.X = 0;
+                mainConsole.Y = 0;
+                mainFram.Add(mainConsole);
+                progressBar = new ProgressBar();
+                progressBar.X = 0;
+                progressBar.Y = 0;
+                progressBar.Width = Dim.Fill();
+                progressBar.Height = 1;
+                progressBar.Visible = false;
+                Add(mainFram);
 
-            switchFram.Title = "Switch build";
-            switchFram.X = 0;
-            switchFram.Y = Pos.Percent(51);
-            switchFram.Width = Dim.Percent(17);
-            switchFram.Height = Dim.Percent(49);
-            Label switchLabel = new Label();
-            switchLabel.X = 0;
-            switchLabel.Y = 0;
-            switchLabel.Width = Dim.Fill();
-            switchLabel.Height = 2;
-            switchLabel.Text = "Enter build number: ";
-            switchFram.Add(switchLabel);
-            TextField textField = new TextField();
-            textField.TextChanging += (args) =>
-            {
-                if (args.NewText.Any(c => !char.IsDigit((char)c) && !char.IsControl((char)c)))
-                    args.Cancel = true;
-            };
-            textField.X = 0;
-            textField.Y = 2;
-            textField.Width = Dim.Percent(80);
-            textField.Height = 1;
-            textField.Text = "";
-            switchFram.Add(textField);
-            Button button = new Button("Install");
-            button.X = 0;
-            button.Y = Pos.Bottom(textField)+1;
-            button.Width = Dim.Percent(50);
-            button.Height = 1;
-            button.Clicked +=  () =>
-            {
-                Task t = null;
-                if (textField.Text.Length > 0  && (t == null || t.IsCompleted))
+                switchFram.Title = "Switch build";
+                switchFram.X = 0;
+                switchFram.Y = Pos.Percent(51);
+                switchFram.Width = Dim.Percent(17);
+                switchFram.Height = Dim.Percent(49);
+                Label switchLabel = new Label();
+                switchLabel.X = 0;
+                switchLabel.Y = 0;
+                switchLabel.Width = Dim.Fill();
+                switchLabel.Height = 2;
+                switchLabel.Text = "Enter build number: ";
+                switchFram.Add(switchLabel);
+                TextField textField = new TextField();
+                textField.TextChanging += (args) =>
                 {
-                   t= new Task(() =>
+                    if (args.NewText.Any(c => !char.IsDigit((char)c) && !char.IsControl((char)c)))
+                        args.Cancel = true;
+                };
+                textField.X = 0;
+                textField.Y = 2;
+                textField.Width = Dim.Percent(80);
+                textField.Height = 1;
+                textField.Text = "";
+                switchFram.Add(textField);
+                Button button = new Button("Install");
+                button.X = 0;
+                button.Y = Pos.Bottom(textField)+1;
+                button.Width = Dim.Percent(50);
+                button.Height = 1;
+                button.Clicked +=  () =>
+                {
+                    Task t = null;
+                    if (textField.Text.Length > 0  && (t == null || t.IsCompleted))
                     {
-                        downloadRelease(new Release(textField.Text.ToString(), true));
-                    });
-                    t.Start();
-                }
-            };
-            switchFram.Add(button);
+                       t= new Task(() =>
+                        {
+                            downloadRelease(new Release(textField.Text.ToString(), true));
+                        });
+                        t.Start();
+                    }
+                };
+                switchFram.Add(button);
 
-            modFram.Title = "Mods";
-            modFram.X = Pos.Percent(18);
-            modFram.Y = Pos.Percent(51);
-            modFram.Width = Dim.Fill();
-            modFram.Height = Dim.Percent(49);
-            modFram.Visible = true;
-            modFram.Add(labelFoundMods);
-            modFram.Add(listView);
-            modFram.Add(btnDownloadMods);
-            modFram.Add(chkAll);
-
-
-            listView.RowRender += ListView_RowRender;
-
-            var _scrollBar = new ScrollBarView(listView, true);
-
-            _scrollBar.ChangedPosition += () => {
-                listView.TopItem = _scrollBar.Position;
-                if (listView.TopItem != _scrollBar.Position)
-                {
-                    _scrollBar.Position = listView.TopItem;
-                }
-                listView.SetNeedsDisplay();
-            };
-
-            _scrollBar.OtherScrollBarView.ChangedPosition += () => {
-                listView.LeftItem = _scrollBar.OtherScrollBarView.Position;
-                if (listView.LeftItem != _scrollBar.OtherScrollBarView.Position)
-                {
-                    _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
-                }
-                listView.SetNeedsDisplay();
-            };
-
-            listView.DrawContent += (e) => {
-                if(listView.Source != null)
-                {
-                    _scrollBar.Size = listView.Source.Count - 1;
-                    _scrollBar.Position = listView.TopItem;
-                    _scrollBar.OtherScrollBarView.Size = listView.Maxlength - 1;
-                    _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
-                    _scrollBar.Refresh();
-                }
-            };
+                modFram.Title = "Mods";
+                modFram.X = Pos.Percent(18);
+                modFram.Y = Pos.Percent(51);
+                modFram.Width = Dim.Fill();
+                modFram.Height = Dim.Percent(49);
+                modFram.Visible = true;
+                modFram.Add(labelFoundMods);
+                modFram.Add(listView);
+                modFram.Add(btnDownloadMods);
+                modFram.Add(chkAll);
 
 
-            Add(switchFram);
-            Add(modFram);
-            Add(progressBar);
-            Application.RootKeyEvent += Application_RootKeyEvent;
-            Application.Init();
+                listView.RowRender += ListView_RowRender;
+
+                var _scrollBar = new ScrollBarView(listView, true);
+
+                _scrollBar.ChangedPosition += () => {
+                    listView.TopItem = _scrollBar.Position;
+                    if (listView.TopItem != _scrollBar.Position)
+                    {
+                        _scrollBar.Position = listView.TopItem;
+                    }
+                    listView.SetNeedsDisplay();
+                };
+
+                _scrollBar.OtherScrollBarView.ChangedPosition += () => {
+                    listView.LeftItem = _scrollBar.OtherScrollBarView.Position;
+                    if (listView.LeftItem != _scrollBar.OtherScrollBarView.Position)
+                    {
+                        _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
+                    }
+                    listView.SetNeedsDisplay();
+                };
+
+                listView.DrawContent += (e) => {
+                    if(listView.Source != null)
+                    {
+                        _scrollBar.Size = listView.Source.Count - 1;
+                        _scrollBar.Position = listView.TopItem;
+                        _scrollBar.OtherScrollBarView.Size = listView.Maxlength - 1;
+                        _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
+                        _scrollBar.Refresh();
+                    }
+                };
 
 
-            Application.MainLoop.Invoke(() =>
-            {
+                Add(switchFram);
+                Add(modFram);
+                Add(progressBar);
 
+
+
+    
+                Application.RootKeyEvent += Application_RootKeyEvent;
+                Application.Init();
+                Console.SetWindowSize(Console.LargestWindowWidth, Console.LargestWindowHeight);
                 this.SetNeedsDisplay();
             });
 
@@ -435,34 +450,34 @@ namespace YuzuEAUpdater
 
         public  UI()
         {
+            getSettings();
+            InitializeComponent();
+
             Task.Run(() =>
             {
                 try
                 {
-                    getSettings();
-                    InitializeComponent();
+
+                    while (mainConsole == null || mainConsole.SuperView == null)
+                    {
+                        System.Threading.Thread.Sleep(1500);
+                        Console.WriteLine("Initialise UI...");
+                    }
                     getCurrentVersion();
+                    _saveBackup();
                     checkVersion();
                     waitYuzuLaunch();
-
                 }
                 catch (Exception ex)
                 {
- 
-                    try
-                    {
-                        addTextConsole(ex.Message);
-                        addTextConsole(ex.StackTrace);
-                    }
-                    catch(Exception ex2)
-                    {
-                        Application.Shutdown();
-                        Console.Write(ex.StackTrace);
-                        Console.ReadLine();
-                    }
+                    Application.Shutdown();
+                    Console.Write(ex.StackTrace);
+                    System.Threading.Thread.Sleep(10000);
+                    Console.ReadLine();
                 }
-           
+
             });
+
 
         }
 
@@ -536,14 +551,16 @@ namespace YuzuEAUpdater
 
             autoStartYuzu = data.Length > 1 ? bool.Parse(data[1]) : true;
             confirmDownload = data.Length > 2 ? bool.Parse(data[2]) : true;
+            backupSave = data.Length > 3 ? bool.Parse(data[3]) : true;
 
             Utils.init7ZipPaht();
+            initAppPath();
         }
 
         private void setSettings()
         {
             StreamWriter writer = new StreamWriter("launchUpdater.txt");
-            writer.Write(currentExe + "|" + autoStartYuzu + "|" + confirmDownload);
+            writer.Write(currentExe + "|" + autoStartYuzu + "|" + confirmDownload + "|" + backupSave);
             writer.Close();
         }
 
@@ -734,35 +751,24 @@ namespace YuzuEAUpdater
             get; set; 
         
         } = new Progress<float>(p => {
-            if(progressBar.Visible == false)
-            {
-                progressBar.Y = progressBar.SuperView.Bounds.Bottom - 1;
-                progressBar.Visible = true;
-            }
+                if (progressBar.Visible == false)
+                {
+                    progressBar.Y = progressBar.SuperView.Bounds.Bottom - 1;
+                    progressBar.Visible = true;
+                }
 
-            progressBar.Fraction = p;
+                progressBar.Fraction = p;
 
-            if(p==1)
-            progressBar.Visible = false;
-
+                if (p == 1)
+                    progressBar.Visible = false;
             });
-
-
 
         private  void scanTitlesIdAndGetName()
         {
             if (games.Count == 0)
             {
 
-                var path = System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "/yuzu";
-
-                if(!Directory.Exists(path))
-                    path = "user";
-                if(!Directory.Exists(path + "/sdmc/atmosphere/contents"))
-                    return;
-
-
-               String[] directorys = Directory.GetDirectories(path+"/sdmc/atmosphere/contents").Select(d => Path.GetFileName(d)).ToArray();
+               String[] directorys = Directory.GetDirectories(pathApp + "/sdmc/atmosphere/contents").Select(d => Path.GetFileName(d)).ToArray();
 
                 HttpClient _httpClient = httpClient();
                 String src = _httpClient.GetAsync("https://switchbrew.org/w/index.php?title=Title_list/Games&mobileaction=toggle_view_desktop").Result.Content.ReadAsStringAsync().Result;
@@ -774,16 +780,98 @@ namespace YuzuEAUpdater
 
                     if (name != "")
                     {
-                        games.Add(new Game(id, name,path));
+                        games.Add(new Game(id, name, pathApp));
                     }
 
                 }
             }
         }
 
- 
 
-      
+        private void _saveBackup()
+        {
+            try
+            {
+                string sourceDir = Path.Combine(pathApp, "nand", "user", "save");
+                if (this.backupSave && Directory.Exists(sourceDir))
+                {
+                    if(!Directory.Exists(Path.Combine(Environment.CurrentDirectory, "savesBackup")))
+                        Directory.CreateDirectory(Path.Combine(Environment.CurrentDirectory, "savesBackup"));   
+
+                    string zipFilePath = Path.Combine(Environment.CurrentDirectory,"savesBackup", DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".7z");
+
+                    SevenZip.SevenZipCompressor compressor = new SevenZip.SevenZipCompressor();
+                    compressor.CompressionLevel = SevenZip.CompressionLevel.Ultra;
+                    compressor.CompressionMethod = SevenZip.CompressionMethod.Lzma2;
+                    compressor.CompressionMode = SevenZip.CompressionMode.Create;
+
+                    compressor.CompressDirectory(sourceDir, zipFilePath);
+           
+                }
+
+                _deleteOldBackups();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.StackTrace + "  " + ex.Message + "\n");
+                 Console.ReadLine();
+            }
+
+            
+        }
+
+
+        private void _deleteOldBackups()
+        {
+            string backupDir = Path.Combine(Environment.CurrentDirectory, "savesBackup");
+            if (!Directory.Exists(backupDir)) return; // backup directory does not exist
+            var backupFiles = new DirectoryInfo(backupDir).GetFiles("*.7z", SearchOption.AllDirectories).OrderBy(f => f.LastWriteTime).ToList(); // get all backup files in the directory sorted by date
+            if (backupFiles.Count < 4) return; // less than 3 backup files present
+
+            backupFiles[0].Delete(); // delete the oldest backup file
+        }
+
+
+        private void restoreLatestBackup()
+        {
+            string backupDir = Path.Combine(Environment.CurrentDirectory, "savesBackup");
+            DirectoryInfo dirInfo = new DirectoryInfo(backupDir);
+            if (dirInfo.Exists)
+            {
+                FileInfo[] files = dirInfo.GetFiles("*.7z");
+                if (files.Length > 0)
+                {
+                    Array.Sort(files, (x, y) => y.CreationTime.CompareTo(x.CreationTime));
+                    FileInfo latestBackup = files[0];
+                    addTextConsole("Restoring latest backup: " + latestBackup.CreationTime.ToString() + "\n");
+                    SevenZip.SevenZipExtractor extractor = new SevenZip.SevenZipExtractor(latestBackup.FullName);
+                    extractor.ExtractArchive(Path.Combine(pathApp, "nand", "user", "save"));
+                    addTextConsole("Restore complete.\n");
+                }
+                else
+                {
+                    addTextConsole("No backup file found.\n");
+                }
+            }
+            else
+            {
+                addTextConsole("Backup directory does not exist.\n");
+            }
+        }
+
+
+        private void initAppPath()
+        {
+             pathApp = Path.Combine(System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) ,"yuzu");
+
+            if (!Directory.Exists(pathApp))
+                pathApp = "user";
+            if (!Directory.Exists(pathApp + "/sdmc/atmosphere/contents"))
+                return;
+        }
+
+
     }
 
 

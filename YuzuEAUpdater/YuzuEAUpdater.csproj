@@ -4,9 +4,8 @@
     <OutputType>Exe</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <StartupObject>YuzuEAUpdater.Program</StartupObject>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <Optimize>False</Optimize>
+	<DebugType>embedded</DebugType> 
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System.IO.Compression" />

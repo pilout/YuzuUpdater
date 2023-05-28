@@ -132,12 +132,12 @@ namespace YuzuEAUpdater
                 }
             }
         }
-    
-            override
-            public string ToString()
-            {
-                return _sName;
-            }
+
+        //Replace the current ToString implementation with a formatted date string
+        public override string ToString()
+        {
+            return $"{_sName}  ({_nLikeCount} likes)";
+        }
 
     }
 }

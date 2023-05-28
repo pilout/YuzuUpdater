@@ -96,40 +96,10 @@ namespace YuzuEAUpdater
 
         public static void init7ZipPaht()
         {
-            var platForm = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
+            var platForm = RuntimeInformation.OSArchitecture;
             var OS = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "Linux" : RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Windows" : "MacOS";
-            bool check = File.Exists(Environment.CurrentDirectory + "/7zip/win32/x64/7zxa.dll");
-            if (OS == "Windows")
-            {
-                if (platForm == Architecture.X64)
-                {
-                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory+ "/7zip/win32/x64/7zxa.dll");
-                }
-                else if (platForm == Architecture.X86)
-                {
-                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/win32/ia32/7zxa.dll");
-                }
-            }
-            else if (OS == "Linux")
-            {
-
-                if (platForm == Architecture.X64)
-                {
-                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/x64/7zz");
-                }
-                else if (platForm == Architecture.X86)
-                {
-                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/ia32/7zz");
-                }
-                else if (platForm == Architecture.Arm)
-                {
-                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/arm/7zz");
-                }
-                else if (platForm == Architecture.Arm64)
-                {
-                    SevenZipBase.SetLibraryPath(Environment.CurrentDirectory + "/7zip/linux/arm64/7zz");
-                }
-            }
+            bool check = File.Exists(Path.Combine(Environment.CurrentDirectory, "7zip", OS == "Windows" ? "win32" : "linux", platForm == Architecture.X64 ? "x64" : platForm == Architecture.Arm64 ? "arm64" : platForm == Architecture.Arm ? "arm" : "ia32", OS == "Windows" ? "7za.dll" : "7zz"));
+            SevenZipBase.SetLibraryPath(Path.Combine(Environment.CurrentDirectory, "7zip", OS == "Windows" ? "win32" : "linux", platForm == Architecture.X64 ? "x64" : platForm == Architecture.Arm64 ? "arm64" : platForm == Architecture.Arm ? "arm" : "ia32", OS == "Windows" ? "7za.dll" : "7zz"));
         }
 
 
