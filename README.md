@@ -5,14 +5,16 @@
 
 -Customizable binary location (Yuzu.exe) through use of editing the launchUpdater.txt file.
 
--You can change yuzu build easyly with -switch <buildID>, sample : -switch 3489
+-You can change yuzu build easyly with switch section.
  
--Ability to download all mods for a given game from Bananamods with -dmods.
+-Ability to download and install automatically mods from banana.
 
-# Requirements
--Required Dotnet Core 3.1 : https://dotnet.microsoft.com/en-us/download/dotnet/3.1
-  
+-Automatic launch yuzu after update disable/enable by settings menu.
+
+-Automaic backup save yuzu game on launch disable/enable. 
+
+
 # Install
- -Excecutable must be placed in Yuzu directory.
+ -Excecutable must be placed in Yuzu directory or a empty folder.
  
 
