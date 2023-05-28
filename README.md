@@ -1,3 +1,5 @@
+![alt text]([http://url/to/img.png](https://i.ibb.co/zbdG3Qz/Sans-titre.png))
+
 # YuzuEAUpdater
 -Ability to install latest Yuzu and automatically update during future launches.
 
