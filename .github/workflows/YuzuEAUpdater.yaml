@@ -37,10 +37,10 @@ jobs:
         run: dotnet restore ${{ env.PROJECT_PATH }}
 
       - name: Publish Project Windows
-        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained -p:PublishSingleFile=true --no-restore -r win-x64
+        run: dotnet publish ${{ env.PROJECT_PATH }} --framework netcoreapp3.1 -c Release --self-contained -p:PublishSingleFile=true --no-restore
 
       - name: Publish Project Linux
-        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained -p:PublishSingleFile=true --no-restore -r linux-x64
+        run: dotnet publish ${{ env.PROJECT_PATH }} --framework netcoreapp3.1 -c Release --self-contained --os linux -p:PublishSingleFile=true --no-restore
 
       - name: Create Zip File WINDOWS
         uses: papeloto/action-zip@v1
