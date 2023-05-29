@@ -239,7 +239,7 @@ namespace YuzuEAUpdater
 
 
 
-                items.Add(new MenuBarItem("Settings", new MenuItem[]
+                items.Add(new MenuBarItem("[Settings]", new MenuItem[]
                 {autoStartItem,
                 confirmDownload,
                 backupSave
@@ -248,8 +248,8 @@ namespace YuzuEAUpdater
 
 
                 Add(MenuBar);
-                items.Add(new MenuBarItem("_Restore latest backup", null, restoreLatestBackup));
-                items.Add(new MenuBarItem("Get last version", null, checkUpdate));
+                items.Add(new MenuBarItem("[Restore latest backup]", null, restoreLatestBackup));
+                items.Add(new MenuBarItem("[Get last version]", null, checkUpdate));
 
                 MenuBar.Menus = items.ToArray();
        
@@ -258,7 +258,7 @@ namespace YuzuEAUpdater
                 {
                     scanTitlesIdAndGetName();
                     if (this.games.Count > 0)
-                        items.Add(new MenuBarItem("Mods", this.games.Select(g => new MenuItem(g.name, null, () =>
+                        items.Add(new MenuBarItem("[Mods]", this.games.Select(g => new MenuItem(g.name, null, () =>
                         {
                             Task task = new Task(() =>
                             {
