@@ -622,7 +622,7 @@ namespace YuzuEAUpdater
 
 
 
-        }
+        } 
 
         public  void checkVersion()
         {
