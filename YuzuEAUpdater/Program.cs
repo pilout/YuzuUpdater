@@ -7,6 +7,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Terminal.Gui;
@@ -247,6 +249,7 @@ namespace YuzuEAUpdater
 
                 Add(MenuBar);
                 items.Add(new MenuBarItem("_Restore latest backup", null, restoreLatestBackup));
+                items.Add(new MenuBarItem("Get last version", null, checkUpdate));
 
                 MenuBar.Menus = items.ToArray();
        
@@ -397,6 +400,8 @@ namespace YuzuEAUpdater
 
         }
 
+
+
         private void ListView_RowRender(ListViewRowEventArgs obj)
         {
             if (obj.Row == listView.SelectedItem)
@@ -452,6 +457,7 @@ namespace YuzuEAUpdater
         {
             getSettings();
             InitializeComponent();
+            purgeUncessaryFiles();
 
             Task.Run(() =>
             {
@@ -872,6 +878,60 @@ namespace YuzuEAUpdater
         }
 
 
+        private void purgeUncessaryFiles()
+        {
+            //FIND all FILLS THAT BEGIN WITH yuzu-windows-msvc-source- in current directory
+           var files = Directory.GetFiles(Environment.CurrentDirectory, "yuzu-windows-msvc-source-*");
+            foreach (var file in files)
+            {
+                try
+                {
+                    System.IO.File.Delete(file);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.StackTrace + "  " + ex.Message + "\n");
+                    Console.ReadLine();
+                }
+            }
+
+        }
+
+
+        private void checkUpdate()
+        {
+            addTextConsole("W'll restart for updates...\n");
+
+                WebClient webClient = new WebClient();
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    if(!File.Exists("updateUpdater.exe"))
+                       File.Delete("updateUpdater.exe");
+                    webClient.DownloadFile("https://github.com/pilout/YuzuUpdater/releases/download/updater/updateUpdater.exe", "updateUpdater.exe");
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    if (!File.Exists("updateUpdater"))
+                        File.Delete("updateUpdater");
+                    webClient.DownloadFile("https://github.com/pilout/YuzuUpdater/releases/download/updater/updateUpdater", "updateUpdater");
+                }
+
+            ProcessStartInfo startInfo = null;
+
+             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+             {
+                Process.Start("chmod", "+x updateUpdater");
+                startInfo = new ProcessStartInfo("updateUpdater");
+             }
+             else
+                startInfo = new ProcessStartInfo("updateUpdater.exe");
+             
+                  
+            startInfo.UseShellExecute = true;
+            Process.Start(startInfo);
+            Process.GetCurrentProcess().Kill();
+        }
     }
 
 
