@@ -27,10 +27,10 @@ jobs:
       - name: Initialize Actions
         uses: actions/checkout@v2
 
-      - name: Initialize .Net
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: netcoreapp3.1
+          dotnet-version: 7.0.x
       
       - name: Restore Project
         run: dotnet restore ${{ env.PROJECT_PATH }}
