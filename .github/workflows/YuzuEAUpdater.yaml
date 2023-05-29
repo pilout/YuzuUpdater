@@ -13,17 +13,21 @@ on:
       - '**/*.gitattributes'
 
 env:
-  PROJECT_PATH: YuzuEAUpdater/YuzuEAUpdater.csproj
-  ZIP_PATH_WINDOWS: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/windows-x64.zip
-  ZIP_PATH_LINUX: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64.zip
-  WINDOWS_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/win-x64
-  LINUX_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64
+  PROJECT_PATH: YuzuEAUpdater\YuzuEAUpdater.csproj
+  ZIP_PATH_WINDOWS: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\windows-x64.zip
+  ZIP_PATH_LINUX: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\linux-x64.zip
+  WINDOWS_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\win-x64
+  LINUX_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\linux-x64
   LIB_PATH: YuzuEAUpdater\bin\release\netcoreapp3.1\win-x64\7zip
   
 
 jobs:
   deploy:
     runs-on: windows-latest
+
+    permissions:
+      contents: 'write'
+      
     steps:
       - name: Initialize Actions
         uses: actions/checkout@v2
