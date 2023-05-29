@@ -26,8 +26,9 @@ jobs:
     runs-on: windows-latest
 
     permissions:
-      contents: 'write'
-      
+      contents: 'read/write'
+      id-token: 'read'
+
     steps:
       - name: Initialize Actions
         uses: actions/checkout@v2
@@ -59,13 +60,15 @@ jobs:
           dest: ${{ env.ZIP_PATH_LINUX}}
           
       - name: Initialize Release
-        uses: actions/create-release@v1
+        uses: actions/create-release@latest
         id: create_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
+          tag_name: dev-lms-${{ github.run_id }}
+          release_name: Release-${{ github.run_id }}
+          draft: false
+          prerelease: false
       
       - name: Create Release    
         uses: csexton/release-asset-action@v2
