@@ -18,7 +18,7 @@ env:
   ZIP_PATH_LINUX: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64.zip
   WINDOWS_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/win-x64
   LINUX_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64
-  7Zip_PATH: YuzuEAUpdater\bin\release\netcoreapp3.1\win-x64\7zip
+  LIB_PATH: YuzuEAUpdater\bin\release\netcoreapp3.1\win-x64\7zip
   
 
 jobs:
@@ -45,13 +45,13 @@ jobs:
       - name: Create Zip File WINDOWS
         uses: papeloto/action-zip@v1
         with:
-          files: ${{ env.WINDOWS_PATH }} ${{ env.7Zip_PATH }}
+          files: ${{ env.WINDOWS_PATH }} ${{ env.LIB_PATH }}
           dest: ${{ env.ZIP_PATH_WINDOWS}}
 
       - name: Create Zip File LINUX
         uses: papeloto/action-zip@v1
         with:
-          files: ${{ env.LINUX_PATH }} ${{ env.7Zip_PATH }}
+          files: ${{ env.LINUX_PATH }} ${{ env.LIB_PATH }}
           dest: ${{ env.ZIP_PATH_LINUX}}
           
       - name: Initialize Release
