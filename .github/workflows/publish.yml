@@ -1,0 +1,65 @@
+name: "Publish"
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  PROJECT_PATH: YuzuEAUpdater/YuzuEAUpdater.csproj
+  ZIP_PATH_WINDOWS: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/windows-x64.zip
+  ZIP_PATH_LINUX: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64.zip
+  WINDOWS_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/win-x64
+  LINUX_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64
+  
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    steps:
+      - name: Initialize Actions
+        uses: actions/checkout@v2
+
+      - name: Initialize .Net
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 7.0.x
+      
+      - name: Restore Project
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish Project Windows
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained -r win-x64 -p:PublishSingleFile=true --no-restore
+
+      - name: Publish Project Linux
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained -r linux-x64 -p:PublishSingleFile=true --no-restore
+
+      - name: Create Zip File WINDOWS
+        uses: papeloto/action-zip@v1
+        with:
+          files: ${{ env.WINDOWS_PATH }}
+          dest: ${{ env.ZIP_PATH_WINDOWS}}
+
+      - name: Create Zip File LINUX
+        uses: papeloto/action-zip@v1
+        with:
+          files: ${{ env.LINUX_PATH }}
+          dest: ${{ env.ZIP_PATH_LINUX}}
+          
+      - name: Initialize Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+      
+      - name: Create Release    
+        uses: csexton/release-asset-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            ${{ env.ZIP_PATH_WINDOWS }}
+            ${{ env.ZIP_PATH_LINUX }}
+          release-url: ${{ steps.create_release.outputs.upload_url }}
