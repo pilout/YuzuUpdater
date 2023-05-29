@@ -18,6 +18,7 @@ env:
   ZIP_PATH_LINUX: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64.zip
   WINDOWS_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/win-x64
   LINUX_PATH: YuzuEAUpdater/bin/Release/netcoreapp3.1/publish/linux-x64
+  7Zip_PATH: YuzuEAUpdater\bin\release\netcoreapp3.1\win-x64\7zip
   
 
 jobs:
@@ -36,21 +37,21 @@ jobs:
         run: dotnet restore ${{ env.PROJECT_PATH }}
 
       - name: Publish Project Windows
-        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained -r win-x64 -p:PublishSingleFile=true --no-restore
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained -p:PublishSingleFile=true --no-restore
 
       - name: Publish Project Linux
-        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained -r linux-x64 -p:PublishSingleFile=true --no-restore
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release --self-contained --os linux -p:PublishSingleFile=true --no-restore
 
       - name: Create Zip File WINDOWS
         uses: papeloto/action-zip@v1
         with:
-          files: ${{ env.WINDOWS_PATH }}
+          files: ${{ env.WINDOWS_PATH }} ${{ env.7Zip_PATH }}
           dest: ${{ env.ZIP_PATH_WINDOWS}}
 
       - name: Create Zip File LINUX
         uses: papeloto/action-zip@v1
         with:
-          files: ${{ env.LINUX_PATH }}
+          files: ${{ env.LINUX_PATH }} ${{ env.7Zip_PATH }}
           dest: ${{ env.ZIP_PATH_LINUX}}
           
       - name: Initialize Release
