@@ -6,6 +6,7 @@
     <StartupObject>YuzuEAUpdater.Program</StartupObject>
     <Optimize>False</Optimize>
 	<DebugType>embedded</DebugType> 
+	<RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System.IO.Compression" />
