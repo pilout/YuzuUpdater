@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 public class Program
 {
@@ -106,5 +107,15 @@ public class Program
         System.Threading.Thread.Sleep(5000);
         Environment.Exit(0);
 
+    }
+
+
+    public static string SHA256CheckSum(string filePath)
+    {
+        using (SHA256 SHA256 = SHA256Managed.Create())
+        {
+            using (FileStream fileStream = File.OpenRead(filePath))
+                return Convert.ToBase64String(SHA256.ComputeHash(fileStream));
+        }
     }
 }
