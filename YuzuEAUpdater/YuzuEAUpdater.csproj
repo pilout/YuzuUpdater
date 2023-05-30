@@ -21,51 +21,8 @@
     <PackageReference Include="Terminal.Gui" Version="1.11.2" />
   </ItemGroup>
 	
-	<ItemGroup>
-	  <None Update="7zip\darwin\7zz">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\arm64\7zz">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\arm64\7zzs">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\arm\7zz">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\arm\7zzs">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\ia32\7zz">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\ia32\7zzs">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\x64\7zz">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\linux\x64\7zzs">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\win32\ia32\7za.dll">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\win32\ia32\7za.exe">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\win32\ia32\7zxa.dll">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\win32\x64\7za.dll">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\win32\x64\7za.exe">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="7zip\win32\x64\7zxa.dll">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>
+	<Target Name="CopyYourFolderAfterPublish" AfterTargets="Publish">
+		<Exec Command="XCOPY &quot;$(ProjectDir)7Zip\*.*&quot; &quot;$(ProjectDir)$(PublishDir)7Zip\&quot; /S /Y" />
+	</Target>
+
 </Project>
