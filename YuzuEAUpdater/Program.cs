@@ -500,8 +500,9 @@ namespace YuzuEAUpdater
                 addTextConsole("Kill yuzu process\n");
 
             foreach (Process p in processes)
+            {
                 p.Kill();
-            
+            }
         }
 		
 		private  void waitYuzuLaunch(){
