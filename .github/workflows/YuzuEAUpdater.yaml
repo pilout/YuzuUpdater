@@ -1,3 +1,5 @@
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 name: "Publish"
 
 on:
@@ -58,7 +60,7 @@ jobs:
         uses: actions/create-release@latest
         id: create_release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         with:
           tag_name: dev-lms-${{ github.run_id }}
           release_name: Release-${{ github.run_id }}
@@ -68,7 +70,7 @@ jobs:
       - name: Create Release    
         uses: csexton/release-asset-action@v2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.ACCESS_TOKEN }}
           files: |
             ${{ env.ZIP_PATH_WINDOWS }}
             ${{ env.ZIP_PATH_LINUX }}
