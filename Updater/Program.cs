@@ -63,6 +63,8 @@ public class Program
                             {
                                 string pathDirEntry = entry.FullName.Substring(0, ind);
                                 Directory.CreateDirectory(Path.Combine(extractPath, pathDirEntry));
+                                if(entry.FullName.EndsWith("/"))
+                                    continue;
                             }
 
 
