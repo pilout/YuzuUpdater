@@ -14,7 +14,8 @@ public class Program
         string latestReleaseUrl = "https://github.com/pilout/YuzuUpdater/releases/latest";
         Uri latestReleaseUri = new Uri(latestReleaseUrl);
         DateTime latestReleaseDate ;
-        string updaterFilePath = (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "YuzuEAUpdater" : "YuzuEAUpdater.exe");
+        bool isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+        string updaterFilePath = isLinux ? "YuzuEAUpdater" : "YuzuEAUpdater.exe");
 
         foreach(Process process in Process.GetProcessesByName(updaterFilePath.Replace(".exe","")))
         {
@@ -29,23 +30,26 @@ public class Program
             StreamReader reader = new StreamReader(stream);
             string htmlContent = reader.ReadToEnd();
 
-            string datePattern = Regex.Match(htmlContent, @"datetime=""(.*)Z""").Groups[1].Value + "Z";
+            string hashsStr = Regex.Match(htmlContent, @"\/pilout\/YuzuUpdater\/releases\/tag\/(.*)""").Groups[1].Value;
+            hashsStr = hashsStr.Substring(0, hashsStr.IndexOf("\""));
+            String[] hashs = hashsStr.Split('|');
 
-            if (datePattern.Length>0)
+            var needDownload = !File.Exists(updaterFilePath) || SHA256CheckSum(updaterFilePath) != (isLinux ? hashs[1] : hashs[0]);
+
+
+            if (needDownload)
             {
-                latestReleaseDate = DateTime.Parse(datePattern);
 
                 FileInfo fileInfo = new FileInfo(updaterFilePath);
                 DateTime updaterCreatedDate = File.GetCreationTime(updaterFilePath);
 
-                if (latestReleaseDate > updaterCreatedDate)
-                {
+
                     Console.WriteLine("Update found, downloading...");
                     // /pilout/YuzuUpdater/releases/tag/1.9" />
-                    string version = Regex.Match(htmlContent, @"\/pilout\/YuzuUpdater\/releases\/tag\/(.*)""").Groups[1].Value;
-                    version = version.Substring(0, version.IndexOf("\""));
+                    
+                    
 
-                    string releasePackageUrl = "https://github.com/pilout/YuzuUpdater/releases/download/" + version + "/" + (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "linux" : "windows" ) + "-x64.zip";
+                    string releasePackageUrl = "https://github.com/pilout/YuzuUpdater/releases/download/" + hashsStr + "/" + (isLinux ? "linux" : "windows" ) + "-x64.zip";
                     string zipFilePath = Path.Combine(Directory.GetCurrentDirectory(),"update00.zip");
                     client.Headers.Add("User-Agent", "request");
                     client.DownloadFile(releasePackageUrl, zipFilePath);
@@ -88,17 +92,15 @@ public class Program
                     Console.WriteLine("Update done, restarting...");
                  
 
-                }
-                else
-                {
-                    Console.WriteLine("No update found, restarting...");
-                }
+            }
+            else
+            {
+                Console.WriteLine("No update found, restarting...");
+            }
 
-                if(RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                if(isLinux)
                    Process.Start("chmod", "+x " + updaterFilePath);
 
-                
-            }
         }
 
         var startInfo = new ProcessStartInfo(updaterFilePath);
