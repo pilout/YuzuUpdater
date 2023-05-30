@@ -2,8 +2,12 @@ name: "Publish"
 
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.gitignore'
+      - '**/*.gitattributes'
   workflow_dispatch:
     branches:
       - main
