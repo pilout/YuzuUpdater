@@ -16,8 +16,8 @@ env:
   PROJECT_PATH: YuzuEAUpdater\YuzuEAUpdater.csproj
   ZIP_PATH_WINDOWS: YuzuEAUpdater\bin\Release\netcoreapp3.1\win-x64\publish\windows-x64.zip
   ZIP_PATH_LINUX: YuzuEAUpdater\bin\Release\netcoreapp3.1\linux-x64\publish\linux-x64.zip
-  WINDOWS_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\win-x64\publish\win-x64
-  LINUX_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\linux-x64\publish\linux-x64
+  WINDOWS_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\win-x64\publish
+  LINUX_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\linux-x64\publish
   LIB_PATH: YuzuEAUpdater\bin\release\netcoreapp3.1\win-x64\7zip
   
 
