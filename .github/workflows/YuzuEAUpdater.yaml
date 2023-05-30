@@ -63,8 +63,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         with:
-          tag_name: dev-lms-${{ github.run_id }}
+          tag_name: Release-${{ github.run_id }}
           release_name: Release-${{ github.run_id }}
+          body: |
+            {{ github.event.head_commit.message }}
           draft: false
           prerelease: false
       
