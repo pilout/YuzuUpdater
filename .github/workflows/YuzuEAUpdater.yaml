@@ -65,7 +65,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         with:
-          tag_name: ${{ hashFiles(env.WINDOWS_EXEC) }}  ${{ hashFiles(env.LINUX_EXEC) }}
+          tag_name: ${{ hashFiles(env.WINDOWS_EXEC) }}|${{ hashFiles(env.LINUX_EXEC) }}
           release_name: Release-${{ github.run_id }}
           body: |
             ${{ github.event.head_commit.message }}
