@@ -14,10 +14,10 @@ on:
 
 env:
   PROJECT_PATH: YuzuEAUpdater\YuzuEAUpdater.csproj
-  ZIP_PATH_WINDOWS: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\windows-x64.zip
-  ZIP_PATH_LINUX: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\linux-x64.zip
-  WINDOWS_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\win-x64
-  LINUX_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\publish\linux-x64
+  ZIP_PATH_WINDOWS: YuzuEAUpdater\bin\Release\netcoreapp3.1\win-x64\publish\windows-x64.zip
+  ZIP_PATH_LINUX: YuzuEAUpdater\bin\Release\netcoreapp3.1\linux-x64\publish\linux-x64.zip
+  WINDOWS_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\win-x64\publish\win-x64
+  LINUX_PATH: YuzuEAUpdater\bin\Release\netcoreapp3.1\linux-x64\publish\linux-x64
   LIB_PATH: YuzuEAUpdater\bin\release\netcoreapp3.1\win-x64\7zip
   
 
@@ -63,7 +63,7 @@ jobs:
         uses: actions/create-release@latest
         id: create_release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           tag_name: dev-lms-${{ github.run_id }}
           release_name: Release-${{ github.run_id }}
@@ -73,7 +73,7 @@ jobs:
       - name: Create Release    
         uses: csexton/release-asset-action@v2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.TOKEN }}
           files: |
             ${{ env.ZIP_PATH_WINDOWS }}
             ${{ env.ZIP_PATH_LINUX }}
