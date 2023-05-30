@@ -501,7 +501,7 @@ namespace YuzuEAUpdater
 
             foreach (Process p in processes)
                 p.Kill();
-            
+             
         }
 		
 		private  void waitYuzuLaunch(){
