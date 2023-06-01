@@ -606,7 +606,7 @@ namespace YuzuEAUpdater
         private void setSettings()
         {
             StreamWriter writer = new StreamWriter("launchUpdater.txt");
-            writer.Write(currentExe + "|" + autoStartYuzu + "|" + confirmDownload + "|" + backupSave);
+            writer.Write(currentExe + "|" + autoStartYuzu + "|" + confirmDownload + "|" + backupSave + "|" + optimizePerf + "|" + killCpuProccess);
             writer.Close();
         }
 
