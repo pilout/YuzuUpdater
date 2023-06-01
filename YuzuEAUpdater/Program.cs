@@ -47,6 +47,8 @@ namespace YuzuEAUpdater
         private static object lockObj = new object();
         private static bool checkall = false;
         private string pathApp = "";
+        private Boolean optimizePerf = true;
+        private Boolean killCpuProccess = false;
 
 
         public async Task<string> waitInput()
@@ -238,11 +240,36 @@ namespace YuzuEAUpdater
                 backupSave.CheckType = MenuItemCheckStyle.Checked;
 
 
+                var optimizePerfomance = new MenuItem("Optimise Perfomance", null, null, null, null, Key.Null);
+                Action actionOptimizePerfomance = () =>
+                {
+                    optimizePerfomance.Checked = !optimizePerfomance.Checked;
+                    this.optimizePerf = optimizePerfomance.Checked;
+                    setSettings();
+                };
+                optimizePerfomance.Action = actionOptimizePerfomance;
+                optimizePerfomance.Checked = this.optimizePerf;
+                optimizePerfomance.CheckType = MenuItemCheckStyle.Checked;
+                
+
+                var killProccessCPU = new MenuItem("Kill Proccess CPU", null, null, null, null, Key.Null);
+                Action actionKillProccessCPU = () =>
+                {
+                    killProccessCPU.Checked = !killProccessCPU.Checked;
+                    this.killCpuProccess = killProccessCPU.Checked;
+                    setSettings();
+                };
+                killProccessCPU.Action = actionKillProccessCPU;
+                killProccessCPU.Checked = this.killCpuProccess;
+                killProccessCPU.CheckType = MenuItemCheckStyle.Checked;
+
 
                 items.Add(new MenuBarItem("[Settings]", new MenuItem[]
                 {autoStartItem,
                 confirmDownload,
-                backupSave
+                backupSave,
+                optimizePerfomance,
+                killProccessCPU
                 }));
 
 
@@ -524,9 +551,21 @@ namespace YuzuEAUpdater
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.RedirectStandardError = true;
+
+            if(this.killCpuProccess)
+                Utils.KillProcessesByCpuUsage(3);
+
             p.Start();
-			
-			while(p.MainWindowHandle==IntPtr.Zero && RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ||( timer > 0))
+            p.WaitForInputIdle();
+            if (this.optimizePerf)
+            {
+                Utils.SetPowerSavingMode(false);
+                Utils.setAffinityMask(p);
+                p.PriorityClass = ProcessPriorityClass.RealTime;
+            }
+
+
+            while (p.MainWindowHandle==IntPtr.Zero && RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ||( timer > 0))
             {
 				System.Threading.Thread.Sleep(1000);
                 timer -= 1000;
@@ -557,6 +596,8 @@ namespace YuzuEAUpdater
             autoStartYuzu = data.Length > 1 ? bool.Parse(data[1]) : true;
             confirmDownload = data.Length > 2 ? bool.Parse(data[2]) : true;
             backupSave = data.Length > 3 ? bool.Parse(data[3]) : true;
+            optimizePerf = data.Length > 4 ? bool.Parse(data[4]) : true;
+            killCpuProccess = data.Length > 5 ? bool.Parse(data[5]) : false;
 
             Utils.init7ZipPaht();
             initAppPath();

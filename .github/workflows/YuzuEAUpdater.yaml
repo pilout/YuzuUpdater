@@ -68,7 +68,7 @@ jobs:
           tag_name: Release-${{ github.run_id }}
           release_name: Release-${{ github.run_id }}
           body: |
-            {{ github.event.head_commit.message }}
+            ${{ github.event.head_commit.message }}
           draft: false
           prerelease: false
       

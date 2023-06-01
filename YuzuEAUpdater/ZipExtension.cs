@@ -11,6 +11,8 @@ using System.Runtime.InteropServices;
 using SevenZip;
 using System.Net.Http;
 using System.Threading;
+using System.Diagnostics;
+using System.ServiceProcess;
 
 namespace YuzuEAUpdater
 {
@@ -154,5 +156,80 @@ namespace YuzuEAUpdater
                 }
             }
 
+
+        public static void setAffinityMask(Process p)
+        {
+            // Récupération du nombre de processeurs logiques sur le système
+            int processorCount = Environment.ProcessorCount;
+
+            if (processorCount < 5)
+                return;
+
+            // Calcul du masque d'affinité en utilisant tous les threads disponibles
+            long affinityMask = 0;
+            for (int i = 0; i < processorCount; i++)
+            {
+                if (i % 2 == 0) // Activer chaque autre thread
+                {
+                    affinityMask |= 1L << i;
+                }
+            }
+            p.ProcessorAffinity= (IntPtr)affinityMask;
+        }
+
+        public static void SetPowerSavingMode(bool enable)
+        {
+            try
+            {
+                const int SC_MONITORPOWER = 0xF170;
+                const int WM_SYSCOMMAND = 0x0112;
+
+                IntPtr HWND_BROADCAST = new IntPtr(0xffff);
+
+                int monitorState = enable ? 2 : -1; // 2 = POWER_ON, -1 = POWER_OFF
+
+                NativeMethods.SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, monitorState);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error setting power saving mode: " + ex.Message);
+            }
+        }
+
+
+        public static void KillProcessesByCpuUsage(float cpuUsageThreshold)
+        {
+            Process[] processes = Process.GetProcesses();
+
+            foreach (Process process in processes)
+            {
+                try
+                {
+                    if (process.Id == Process.GetCurrentProcess().Id)
+                        continue;
+
+                    if (process.TotalProcessorTime.TotalSeconds > TimeSpan.FromSeconds(cpuUsageThreshold).TotalSeconds)
+                    {
+                        UI.addTextConsole($"Terminating process: {process.ProcessName} (ID: {process.Id})\n");
+                        process.Kill();
+                       
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error terminating process: {process.ProcessName} (ID: {process.Id})");
+                    Console.WriteLine(ex.Message);
+                }
+            }
+        }
+
+
+
+
+        internal static class NativeMethods
+        {
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            internal static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+        }
     }
 }
