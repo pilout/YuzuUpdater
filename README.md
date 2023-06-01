@@ -15,6 +15,10 @@
 
 -Automaic backup save yuzu game on launch disable/enable. 
 
+-Optimise processor settings for starting yuzu automatically.
+
+-Kill process that use CPU on yuzu launch.
+
 
 # Install
  -Excecutable must be placed in Yuzu directory or a empty folder.
