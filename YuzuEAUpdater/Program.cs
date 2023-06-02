@@ -484,8 +484,6 @@ namespace YuzuEAUpdater
         {
             getSettings();
             InitializeComponent();
-            purgeUncessaryFiles();
-
             Task.Run(() =>
             {
                 try
@@ -496,6 +494,7 @@ namespace YuzuEAUpdater
                         System.Threading.Thread.Sleep(1500);
                         Console.WriteLine("Initialise UI...");
                     }
+                    purgeUncessaryFiles();
                     getCurrentVersion();
                     _saveBackup();
                     checkVersion();
@@ -723,7 +722,7 @@ namespace YuzuEAUpdater
             {
                 addTextConsole("Yuzu is up to date" + "\n");
             }
-
+          
         }
 
         private void  downloadRelease(Release release)
@@ -759,7 +758,9 @@ namespace YuzuEAUpdater
                     Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
                     System.IO.File.Move("yuzu.exe", currentExe);
                 }
-			}
+
+                purgeUncessaryFiles();
+            }
 			catch(Exception ex){
 				addTextConsole(ex.StackTrace + "  " + ex.Message + "\n");
 				Console.ReadLine();
@@ -839,7 +840,8 @@ namespace YuzuEAUpdater
             try
             {
                 string sourceDir = Path.Combine(pathApp, "nand", "user", "save");
-                if (this.backupSave && Directory.Exists(sourceDir))
+                DirectoryInfo directoryInfo = new DirectoryInfo(sourceDir);
+                if (this.backupSave && directoryInfo.Exists && directoryInfo.GetDirectories().Length>0)
                 {
                     if(!Directory.Exists(Path.Combine(Environment.CurrentDirectory, "savesBackup")))
                         Directory.CreateDirectory(Path.Combine(Environment.CurrentDirectory, "savesBackup"));   
@@ -852,10 +854,12 @@ namespace YuzuEAUpdater
                     compressor.CompressionMode = SevenZip.CompressionMode.Create;
 
                     compressor.CompressDirectory(sourceDir, zipFilePath);
-           
+
+                    _deleteOldBackups();
+
                 }
 
-                _deleteOldBackups();
+            
 
             }
             catch (Exception ex)
@@ -920,6 +924,7 @@ namespace YuzuEAUpdater
 
         private void purgeUncessaryFiles()
         {
+            UI.addTextConsole("Purging uncessary files...\n");
             //FIND all FILLS THAT BEGIN WITH yuzu-windows-msvc-source- in current directory
            var files = Directory.GetFiles(Environment.CurrentDirectory, "yuzu-windows-msvc-source-*");
             foreach (var file in files)
@@ -927,6 +932,8 @@ namespace YuzuEAUpdater
                 try
                 {
                     System.IO.File.Delete(file);
+                    FileInfo fileInfo = new FileInfo(file);
+                    UI.addTextConsole(" -Deleted " + fileInfo.Name + "\n");
                 }
                 catch (Exception ex)
                 {
