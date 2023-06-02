@@ -7,8 +7,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Terminal.Gui;
@@ -812,6 +810,13 @@ namespace YuzuEAUpdater
 
         private  void scanTitlesIdAndGetName()
         {
+            if(pathApp == "")
+            {
+                addTextConsole("Path to yuzu data not found" + "\n");
+                return;
+            }
+                
+
             if (games.Count == 0)
             {
 
@@ -918,7 +923,8 @@ namespace YuzuEAUpdater
             if (!Directory.Exists(pathApp))
                 pathApp = "user";
             if (!Directory.Exists(pathApp + "/sdmc/atmosphere/contents"))
-                return;
+                pathApp = "";
+
         }
 
 
