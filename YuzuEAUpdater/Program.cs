@@ -820,7 +820,14 @@ namespace YuzuEAUpdater
             if (games.Count == 0)
             {
 
-               String[] directorys = Directory.GetDirectories(pathApp + "/sdmc/atmosphere/contents").Select(d => Path.GetFileName(d)).ToArray();
+               List<String> directorys = Directory.GetDirectories(pathApp + "/sdmc/atmosphere/contents").Select(d => Path.GetFileName(d)).ToList();
+                var files = Directory.GetFiles(pathApp + "/config/custom").Select(f => new FileInfo(f)).Select(fi=> fi.Name.Replace(fi.Extension,"")).ToList();
+                var files2 = Directory.GetDirectories(pathApp + "/contents").Select(d => Path.GetFileName(d)).ToList();
+                var files3= Directory.GetDirectories(pathApp + "/nand/user/save","010*",SearchOption.AllDirectories).Select(d => Path.GetFileName(d)).ToList();
+                directorys.AddRange(files);
+                directorys.AddRange(files2);
+                directorys.AddRange(files3);
+                directorys = directorys.Distinct().ToList();
 
                 HttpClient _httpClient = httpClient();
                 String src = _httpClient.GetAsync("https://switchbrew.org/w/index.php?title=Title_list/Games&mobileaction=toggle_view_desktop").Result.Content.ReadAsStringAsync().Result;
