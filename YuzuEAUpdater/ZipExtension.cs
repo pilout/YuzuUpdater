@@ -200,12 +200,13 @@ namespace YuzuEAUpdater
         public static void KillProcessesByCpuUsage(float cpuUsageThreshold)
         {
             Process[] processes = Process.GetProcesses();
+            String[] ignoreProcessNames = new string[] { "explorer.exe", "taskmgr.exe", "System", "Idle" };
 
             foreach (Process process in processes)
             {
                 try
                 {
-                    if (process.Id == Process.GetCurrentProcess().Id)
+                    if (process.Id == Process.GetCurrentProcess().Id ||  ignoreProcessNames.Contains(process.ProcessName))
                         continue;
 
                     if (process.TotalProcessorTime.TotalSeconds > TimeSpan.FromSeconds(cpuUsageThreshold).TotalSeconds)
