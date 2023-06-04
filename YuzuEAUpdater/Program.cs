@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Terminal.Gui;
+using YuzuEAUpdater.UI;
 
 namespace YuzuEAUpdater
 {
@@ -18,13 +19,13 @@ namespace YuzuEAUpdater
         static void Main(string[] args)
         {
 
-            Application.Run<UI>();
+            Application.Run<MainWindow>();
             Application.Shutdown();
 
         }
     }
 
-    internal class UI : Window
+    public class MainWindow : Window
     {
         private  List<Release> releases = new List<Release>();
         private  List<PR> prList = new List<PR>();
@@ -32,70 +33,19 @@ namespace YuzuEAUpdater
         private  string currentVersion = null;
         private  Release myCurrentRelease = null;
         private  string currentExe = "yuzu.exe";
-        private  List<Game> games = new List<Game>();
-        public static  Label mainConsole ;
-        private static ProgressBar progressBar ;
-        private static ListView listView;
-        private  Boolean _waitInput = false;
-        private string _input = "";
-        private static List<int> linesIndex = new List<int>();
-        private bool autoStartYuzu;
-        private bool confirmDownload;
-        private bool backupSave = false;
-        private static object lockObj = new object();
-        private static bool checkall = false;
+        public  List<Game> games = new List<Game>();
+        public static object lockObj = new object();
         private string pathApp = "";
-        private Boolean optimizePerf = true;
-        private Boolean killCpuProccess = false;
+        public Boolean optimizePerf = true;
+        public Boolean killCpuProccess = false;
+        public bool autoStartYuzu;
+        public bool confirmDownload;
+        public bool backupSave = false;
+        public static MainUI MainUI;
 
 
-        public async Task<string> waitInput()
-        {
-            addTextConsole("\n");
-            _waitInput = true;
-            while (_waitInput)
-            {
-              await Task.Delay(100);
-            }
-            var temp = _input;
-            _input = "";
-            return temp;
-        }
 
-        public static void addTextConsole(String text)
-        {
-
-            int[] indexs = text.Select((b, i) => b == '\n' ? i + mainConsole.Text.Length : -1).Where(i => i != -1).ToArray();
-            linesIndex.AddRange(indexs);
-
-            Application.MainLoop.Invoke(() =>
-            {
-                mainConsole.Text += (text);
-
-                if(mainConsole.SuperView.Bounds.Height>0)
-                {
-                    while (linesIndex.Count > 0 && (mainConsole.Frame.Bottom) > mainConsole.SuperView.Bounds.Height)
-                    {
-                        var index = linesIndex.First();
-                        if(index < mainConsole.Text.Length)
-                            mainConsole.Text = mainConsole.Text.Substring(index);
-                        else
-                            mainConsole.Text = "";
-
-                        linesIndex.RemoveAt(0);
-
-                        foreach(var l in linesIndex.ToList())
-                        {
-                            linesIndex[linesIndex.IndexOf(l)] = l - index;
-                        }
-
-                    }
-                }
-
-
-                    mainConsole.SetNeedsDisplay();
-            });
-        } 
+        
 
         private void InitializeComponent()
         {
@@ -108,316 +58,8 @@ namespace YuzuEAUpdater
                 Width = Dim.Fill();
                 Height = Dim.Fill();
 
-                MenuBar = new MenuBar();
-                FrameView mainFram = new FrameView();
-                FrameView switchFram = new FrameView();
-                FrameView modFram = new FrameView();
-                List<MenuBarItem> items = new List<MenuBarItem>();
-                listView = new ListView()
-                {
-                    X = 1,
-                    Y = 2,
-                    Height = Dim.Fill(),
-                    Width = Dim.Fill(1),
-                    //ColorScheme = Colors.TopLevel,
-                    AllowsMarking = true,
-                    AllowsMultipleSelection = true
-                };
-
-                Label labelFoundMods = new Label();
-                labelFoundMods.X = 1;
-                labelFoundMods.Y = 1;
-                labelFoundMods.Text = "";
-                Button btnDownloadMods = new Button("Install");
-                btnDownloadMods.Visible = false;
-                btnDownloadMods.X = Pos.Percent(60);
-                btnDownloadMods.Y = 1;
-                Button chkAll = new Button("Check All");
-                chkAll.X = Pos.Right(btnDownloadMods) + 1;
-                chkAll.Y = 1;
-                chkAll.Visible = false;
-                chkAll.Clicked += () =>
-                {
-                    if (listView.Source== null)
-                        return;
-                    var i = 0;
-                    foreach (var mod in listView.Source.ToList())
-                    {
-                        listView.Source.SetMark(i, !checkall);
-                        i++;
-                    }
-
-                    checkall = !checkall;
-                    if(checkall)
-                        chkAll.Text = "Uncheck All";
-                    else
-                        chkAll.Text = "Check All";
-                };
-                Task modsTask = null;
-                btnDownloadMods.Clicked += () =>
-                {
-                    if (listView.Source.Count == 0 || (modsTask != null && !modsTask.IsCompleted)  )
-                        return;
-
-                    List<BananaMod> mods = listView.Source.ToList() as List<BananaMod>;
-                    modsTask = new Task(() =>
-                    {
-                        List<BananaMod> markedMods = new List<BananaMod>();
-                        var i = 0;
-                        foreach (var mod in mods)
-                        {
-                            if (listView.Source.IsMarked(i))
-                                markedMods.Add(mod);
-                            i++;
-                        }
-
-                        List<Task> tasks = new List<Task>();
-                        var index = 0;
-                        var nbTaskDone = 0;
-                        foreach (BananaMod mod in markedMods)
-                        {
-                            Task task = new Task(() =>
-                            {
-                                mod.download();
-                                mod.extract();
-                                lock (lockObj)
-                                {
-                                    nbTaskDone++;
-                                    progress.Report((float)nbTaskDone / (float)markedMods.Count);
-                                }
-                            });
-                            tasks.Add(task);
-                            task.Start();
-                            index++;
-
-                            if (index % 3 == 0)
-                                Task.WaitAll(tasks.ToArray());
-
-                        }
-
-                        Task.WaitAll(tasks.ToArray());
-
-                    });
-                    modsTask.Start();
-                };
-
-
-                var autoStartItem= new MenuItem("AutoStart Yuzu", null,null, null, null, Key.Null);
-               Action autoStartAction = () =>
-               {
-                 autoStartItem.Checked = !autoStartItem.Checked;
-                 this.autoStartYuzu = autoStartItem.Checked;
-                 setSettings();
-               };
-                autoStartItem.Action = autoStartAction;
-                autoStartItem.Checked = this.autoStartYuzu;
-                autoStartItem.CheckType = MenuItemCheckStyle.Checked;
-
-
-                var confirmDownload = new MenuItem("Ask download", null, null, null,null, Key.Null);
-                Action actionConfirmD = () =>
-                {
-                    confirmDownload.Checked = !confirmDownload.Checked;
-                    this.confirmDownload = confirmDownload.Checked;
-                    setSettings();
-                };
-                confirmDownload.Action = actionConfirmD;
-                confirmDownload.Checked = this.confirmDownload;
-                confirmDownload.CheckType = MenuItemCheckStyle.Checked;
-
-
-                var backupSave = new MenuItem("Backup Save at start", null, null, null, null, Key.Null);
-                Action actionBackupSave = () =>
-                {
-                    backupSave.Checked = !backupSave.Checked;
-                    this.backupSave = backupSave.Checked;
-                    setSettings();
-                };
-                backupSave.Action = actionBackupSave;
-                backupSave.Checked = this.backupSave;
-                backupSave.CheckType = MenuItemCheckStyle.Checked;
-
-
-                var optimizePerfomance = new MenuItem("Optimise Perfomance", null, null, null, null, Key.Null);
-                Action actionOptimizePerfomance = () =>
-                {
-                    optimizePerfomance.Checked = !optimizePerfomance.Checked;
-                    this.optimizePerf = optimizePerfomance.Checked;
-                    setSettings();
-                };
-                optimizePerfomance.Action = actionOptimizePerfomance;
-                optimizePerfomance.Checked = this.optimizePerf;
-                optimizePerfomance.CheckType = MenuItemCheckStyle.Checked;
+                MainUI = new MainUI(this);
                 
-
-                var killProccessCPU = new MenuItem("Kill Proccess CPU", null, null, null, null, Key.Null);
-                Action actionKillProccessCPU = () =>
-                {
-                    killProccessCPU.Checked = !killProccessCPU.Checked;
-                    this.killCpuProccess = killProccessCPU.Checked;
-                    setSettings();
-                };
-                killProccessCPU.Action = actionKillProccessCPU;
-                killProccessCPU.Checked = this.killCpuProccess;
-                killProccessCPU.CheckType = MenuItemCheckStyle.Checked;
-
-
-                items.Add(new MenuBarItem("[Settings]", new MenuItem[]
-                {autoStartItem,
-                confirmDownload,
-                backupSave,
-                optimizePerfomance,
-                killProccessCPU
-                }));
-
-
-
-                Add(MenuBar);
-                items.Add(new MenuBarItem("[Restore latest backup]", null, restoreLatestBackup));
-                items.Add(new MenuBarItem("[Get last version]", null, checkUpdate));
-
-                MenuBar.Menus = items.ToArray();
-       
-
-                Task t = new Task(() =>
-                {
-                    scanTitlesIdAndGetName();
-                    if (this.games.Count > 0)
-                        items.Add(new MenuBarItem("[Mods]", this.games.Select(g => new MenuItem(g.name, null, () =>
-                        {
-                            Task task = new Task(() =>
-                            {
-                                g.loadMods(this.progress);
-                                modFram.Title = "Mods for " + g.name;
-                                labelFoundMods.Text = g.validBananaMods.Count + " mods found";
-                                listView.SetSource(g.validBananaMods);
-                                btnDownloadMods.Visible = true;
-                                chkAll.Visible = true;
-                            });
-                             task.Start();
-                        }, null, null, Key.Null)).ToArray()));
-                    else
-                        items.Add(new MenuBarItem("Mods", new MenuItem[] { new MenuItem("No game found", null, null, null, null, Key.Null) }));
-                    MenuBar.Menus = items.ToArray();
-                });
-
-                t.Start();
-
-          
-                mainFram.X = 0;
-                mainFram.Y = 1;
-                mainFram.Width = Dim.Fill();
-                mainFram.Height = Dim.Percent(49);
-                mainFram.Title = "Logs";
-                mainConsole = new Label();
-                mainConsole.X = 0;
-                mainConsole.Y = 0;
-                mainFram.Add(mainConsole);
-                progressBar = new ProgressBar();
-                progressBar.X = 0;
-                progressBar.Y = 0;
-                progressBar.Width = Dim.Fill();
-                progressBar.Height = 1;
-                progressBar.Visible = false;
-                Add(mainFram);
-
-                switchFram.Title = "Switch build";
-                switchFram.X = 0;
-                switchFram.Y = Pos.Percent(51);
-                switchFram.Width = Dim.Percent(17);
-                switchFram.Height = Dim.Percent(49);
-                Label switchLabel = new Label();
-                switchLabel.X = 0;
-                switchLabel.Y = 0;
-                switchLabel.Width = Dim.Fill();
-                switchLabel.Height = 2;
-                switchLabel.Text = "Enter build number: ";
-                switchFram.Add(switchLabel);
-                TextField textField = new TextField();
-                textField.TextChanging += (args) =>
-                {
-                    if (args.NewText.Any(c => !char.IsDigit((char)c) && !char.IsControl((char)c)))
-                        args.Cancel = true;
-                };
-                textField.X = 0;
-                textField.Y = 2;
-                textField.Width = Dim.Percent(80);
-                textField.Height = 1;
-                textField.Text = "";
-                switchFram.Add(textField);
-                Button button = new Button("Install");
-                button.X = 0;
-                button.Y = Pos.Bottom(textField)+1;
-                button.Width = Dim.Percent(50);
-                button.Height = 1;
-                button.Clicked +=  () =>
-                {
-                    Task t = null;
-                    if (textField.Text.Length > 0  && (t == null || t.IsCompleted))
-                    {
-                       t= new Task(() =>
-                        {
-                            downloadRelease(new Release(textField.Text.ToString(), true));
-                        });
-                        t.Start();
-                    }
-                };
-                switchFram.Add(button);
-
-                modFram.Title = "Mods";
-                modFram.X = Pos.Percent(18);
-                modFram.Y = Pos.Percent(51);
-                modFram.Width = Dim.Fill();
-                modFram.Height = Dim.Percent(49);
-                modFram.Visible = true;
-                modFram.Add(labelFoundMods);
-                modFram.Add(listView);
-                modFram.Add(btnDownloadMods);
-                modFram.Add(chkAll);
-
-
-                listView.RowRender += ListView_RowRender;
-
-                var _scrollBar = new ScrollBarView(listView, true);
-
-                _scrollBar.ChangedPosition += () => {
-                    listView.TopItem = _scrollBar.Position;
-                    if (listView.TopItem != _scrollBar.Position)
-                    {
-                        _scrollBar.Position = listView.TopItem;
-                    }
-                    listView.SetNeedsDisplay();
-                };
-
-                _scrollBar.OtherScrollBarView.ChangedPosition += () => {
-                    listView.LeftItem = _scrollBar.OtherScrollBarView.Position;
-                    if (listView.LeftItem != _scrollBar.OtherScrollBarView.Position)
-                    {
-                        _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
-                    }
-                    listView.SetNeedsDisplay();
-                };
-
-                listView.DrawContent += (e) => {
-                    if(listView.Source != null)
-                    {
-                        _scrollBar.Size = listView.Source.Count - 1;
-                        _scrollBar.Position = listView.TopItem;
-                        _scrollBar.OtherScrollBarView.Size = listView.Maxlength - 1;
-                        _scrollBar.OtherScrollBarView.Position = listView.LeftItem;
-                        _scrollBar.Refresh();
-                    }
-                };
-
-
-                Add(switchFram);
-                Add(modFram);
-                Add(progressBar);
-
-
-
-    
-                Application.RootKeyEvent += Application_RootKeyEvent;
                 Application.Init();
                 Console.SetWindowSize(Console.LargestWindowWidth, Console.LargestWindowHeight);
                 this.SetNeedsDisplay();
@@ -426,59 +68,7 @@ namespace YuzuEAUpdater
         }
 
 
-
-        private void ListView_RowRender(ListViewRowEventArgs obj)
-        {
-            if (obj.Row == listView.SelectedItem)
-            {
-                return;
-            }
-            if (listView.AllowsMarking && listView.Source.IsMarked(obj.Row))
-            {
-                obj.RowAttribute = new Terminal.Gui.Attribute(Color.BrightRed, Color.BrightYellow);
-                return;
-            }
-            if (obj.Row % 2 == 0)
-            {
-                obj.RowAttribute = new Terminal.Gui.Attribute(Color.BrightGreen, Color.Magenta);
-            }
-            else
-            {
-                obj.RowAttribute = new Terminal.Gui.Attribute(Color.BrightMagenta, Color.Green);
-            }
-        }
-
-        private bool Application_RootKeyEvent(KeyEvent arg)
-        {
-            if (_waitInput && mainConsole.SuperView.SuperView.Visible)
-            {
-                if (arg.Key == Key.Enter)
-                {
-                    _waitInput = false;
-                    addTextConsole("\n");
-                }
-                else if (arg.Key == Key.DeleteChar || arg.Key == Key.Backspace)
-                {
-                    if (_input.Length >= 1)
-                    {
-                        mainConsole.Text = mainConsole.Text.Substring(0, mainConsole.Text.Length - 1);
-                        _input = _input.Substring(0, _input.Length - 1);
-                    }
-
-                }
-                else if (!char.IsControl((char)arg.Key))
-                {
-
-                    addTextConsole(((char)arg.Key).ToString());
-                    _input += ((char)arg.Key).ToString();
-
-                }
-                return true;
-            }
-            return false;
-        }
-
-        public  UI()
+        public  MainWindow()
         {
             getSettings();
             InitializeComponent();
@@ -487,14 +77,14 @@ namespace YuzuEAUpdater
                 try
                 {
 
-                    while (mainConsole == null || mainConsole.SuperView == null)
+                    while (MainUI.mainConsole == null || MainUI.mainConsole.SuperView == null)
                     {
                         System.Threading.Thread.Sleep(1500);
                         Console.WriteLine("Initialise UI...");
                     }
                     purgeUncessaryFiles();
-                    getCurrentVersion();
                     _saveBackup();
+                    getCurrentVersion();
                     checkVersion();
                     waitYuzuLaunch();
                 }
@@ -521,7 +111,7 @@ namespace YuzuEAUpdater
                 processes = Process.GetProcessesByName("yuzu");
 
             if (processes.Length > 0)
-                addTextConsole("Kill yuzu process\n");
+                MainUI.addTextConsole("Kill yuzu process\n");
 
             foreach (Process p in processes)
                 p.Kill();
@@ -538,11 +128,11 @@ namespace YuzuEAUpdater
 
             if(!System.IO.File.Exists(currentExe))
             {
-                addTextConsole("Yuzu not found\n");
+                MainUI.addTextConsole("Yuzu not found\n");
                 return;
             }
 
-            addTextConsole("Starting Yuzu...\n");
+            MainUI.addTextConsole("Starting Yuzu...\n");
             Process p = new Process();
             p.StartInfo.FileName = currentExe;
             p.StartInfo.UseShellExecute = false;
@@ -576,7 +166,7 @@ namespace YuzuEAUpdater
 
         }
 
-        private  void getSettings()
+        public  void getSettings()
         {
             string[] data =  new string[0];
             if (System.IO.File.Exists("launchUpdater.txt"))
@@ -600,7 +190,7 @@ namespace YuzuEAUpdater
             initAppPath();
         }
 
-        private void setSettings()
+        public void setSettings()
         {
             StreamWriter writer = new StreamWriter("launchUpdater.txt");
             writer.Write(currentExe + "|" + autoStartYuzu + "|" + confirmDownload + "|" + backupSave + "|" + optimizePerf + "|" + killCpuProccess);
@@ -631,7 +221,7 @@ namespace YuzuEAUpdater
                         currentExe = files.First();
                         currentVersion = currentExe.Substring(currentExe.LastIndexOf("-") + 1, currentExe.LastIndexOf(".") - currentExe.LastIndexOf("-") - 1);
                         currentVersion = "EA-" + currentVersion;
-                        addTextConsole("Yuzu EA version found : " + currentVersion + "\n");
+                        MainUI.addTextConsole("Yuzu EA version found : " + currentVersion + "\n");
                     }
                 }
                 else
@@ -647,14 +237,14 @@ namespace YuzuEAUpdater
                             currentVersion = currentVersion.Substring(1);
 
                         currentVersion = "EA-" + currentVersion;
-                        addTextConsole("Yuzu EA version found : " + currentVersion + "\n");
+                        MainUI.addTextConsole("Yuzu EA version found : " + currentVersion + "\n");
                     }
                 }
             }
             catch(ArgumentOutOfRangeException e) 
             { 
-                addTextConsole("Its seem you dont use EA Yuzu version." + "\n");
-                addTextConsole("You must use EA version from pineapple here : https://github.com/pineappleEA/pineapple-src/releases." + "\n");
+                MainUI.addTextConsole("Its seem you dont use EA Yuzu version." + "\n");
+                MainUI.addTextConsole("You must use EA version from pineapple here : https://github.com/pineappleEA/pineapple-src/releases." + "\n");
             }
 
 
@@ -664,7 +254,7 @@ namespace YuzuEAUpdater
         public  void checkVersion()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-            addTextConsole("Check for YUZU EA update" + "\n");
+            MainUI.addTextConsole("Check for YUZU EA update" + "\n");
 
 
             String src =  httpClient().GetAsync("https://github.com/pineappleEA/pineapple-src/releases/").Result.Content.ReadAsStringAsync().Result;
@@ -677,7 +267,7 @@ namespace YuzuEAUpdater
             }
 
             if(currentVersion == null)
-                addTextConsole("No version found" + "\n");
+                MainUI.addTextConsole("No version found" + "\n");
             
             myCurrentRelease = releases.Where(x => x.version == currentVersion).FirstOrDefault();
             if(myCurrentRelease == null)
@@ -685,10 +275,10 @@ namespace YuzuEAUpdater
             
             if (myCurrentRelease != releases.FirstOrDefault())
             {
-                addTextConsole("Retrieve PRs from github" + "\n");
+                MainUI.addTextConsole("Retrieve PRs from github" + "\n");
                 for (var p = 0; p < 4; p++)
                 {
-                    progress.Report((p + 1) * 0.25f);
+                    MainUI.progress.Report((p + 1) * 0.25f);
                     src = httpClient().GetAsync("https://github.com/yuzu-emu/yuzu/issues?page=" + p + "&q=sort%3Acreated-desc").Result.Content.ReadAsStringAsync().Result;
 
                     string[] prs = src.Split(new String[] { "<div class=\"flex-auto min-width-0 p-2 pr-3 pr-md-2\">" }, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
@@ -706,11 +296,11 @@ namespace YuzuEAUpdater
 
                 string changeLog = getChangeLog();
 
-                addTextConsole("New Version found , pass from " + currentVersion + " to " + releases[0].version + "\n" + getChangeLog());
+                MainUI.addTextConsole("New Version found , pass from " + currentVersion + " to " + releases[0].version + "\n" + getChangeLog());
                 if(confirmDownload)
                 {
-                    addTextConsole("Do you want to download it ? (y/n)" + "\n");
-                    string answer = waitInput().Result;
+                    MainUI.addTextConsole("Do you want to download it ? (y/n)" + "\n");
+                    string answer = MainUI.waitInput().Result;
                     if (answer != "y")
                         return;
                 }
@@ -718,24 +308,24 @@ namespace YuzuEAUpdater
             }
             else
             {
-                addTextConsole("Yuzu is up to date" + "\n");
+                MainUI.addTextConsole("Yuzu is up to date" + "\n");
             }
           
         }
 
-        private void  downloadRelease(Release release)
+        public void  downloadRelease(Release release)
         {
 			try{
                 killYuzus();
-                addTextConsole("Downloading "+ release.version + " version" + "\n");
+                MainUI.addTextConsole("Downloading "+ release.version + " version" + "\n");
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     String fileName = System.IO.Path.GetFileName(new Uri(release.downloadUrl).LocalPath);
                     download(release.downloadUrl, fileName).GetAwaiter().GetResult();
-                    addTextConsole("Make executable" + "\n");
+                    MainUI.addTextConsole("Make executable" + "\n");
                     Process.Start("chmod", "+x " + fileName);
-                    addTextConsole("Remove old version" + "\n");
+                    MainUI.addTextConsole("Remove old version" + "\n");
                     if (System.IO.File.Exists(currentExe))
                         System.IO.File.Delete(currentExe);
 
@@ -747,21 +337,21 @@ namespace YuzuEAUpdater
                     ZipArchive zip = ZipFile.OpenRead("YuzuEA.zip");
                     zip.ExtractToDirectory(System.Environment.CurrentDirectory, true);
                     zip.Dispose();
-                    addTextConsole("Remove zip file" + "\n");
+                    MainUI.addTextConsole("Remove zip file" + "\n");
                     System.IO.File.Delete("YuzuEA.zip");
                     string[] files = Directory.GetFiles(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access");
-                    addTextConsole("Move files and directory to root directory" + "\n");
+                    MainUI.addTextConsole("Move files and directory to root directory" + "\n");
                     if (System.IO.File.Exists(currentExe))
                         System.IO.File.Delete(currentExe);
                     Utils.DirectoryCopyAndDelete(System.Environment.CurrentDirectory + "/yuzu-windows-msvc-early-access", System.Environment.CurrentDirectory);
                     System.IO.File.Move("yuzu.exe", currentExe);
                 }
-
+                MainUI.addTextConsole("Install to " + release.version + " success !\n");
                 purgeUncessaryFiles();
             }
 			catch(Exception ex){
-				addTextConsole(ex.StackTrace + "  " + ex.Message + "\n");
-				Console.ReadLine();
+				MainUI.addTextConsole(ex.StackTrace + "  " + ex.Message + "\n");
+
 			}
         }
 
@@ -786,47 +376,30 @@ namespace YuzuEAUpdater
             using (var file = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None))
             {
 
-                await _httpClient.DownloadAsync(uri, file, progress);
+                await _httpClient.DownloadAsync(uri, file, MainUI.progress);
             }
 
         }
 
-        private IProgress<float> progress
-        {
-            get; set; 
-        
-        } = new Progress<float>(p => {
-                if (progressBar.Visible == false)
-                {
-                    progressBar.Y = progressBar.SuperView.Bounds.Bottom - 1;
-                    progressBar.Visible = true;
-                }
 
-                progressBar.Fraction = p;
 
-                if (p == 1)
-                    progressBar.Visible = false;
-            });
-
-        private  void scanTitlesIdAndGetName()
+        public void scanTitlesIdAndGetName()
         {
             if(pathApp == "")
             {
-                addTextConsole("Path to yuzu data not found" + "\n");
+                MainUI.addTextConsole("Path to yuzu data not found" + "\n");
                 return;
+            }
+            else
+            {
+                MainUI.addTextConsole("Path to yuzu data found: " + pathApp + "\n");
             }
                 
 
             if (games.Count == 0)
             {
 
-               List<String> directorys = Directory.GetDirectories(pathApp + "/sdmc/atmosphere/contents").Select(d => Path.GetFileName(d)).ToList();
-                var files = Directory.GetFiles(pathApp + "/config/custom").Select(f => new FileInfo(f)).Select(fi=> fi.Name.Replace(fi.Extension,"")).ToList();
-                var files2 = Directory.GetDirectories(pathApp + "/contents").Select(d => Path.GetFileName(d)).ToList();
-                var files3= Directory.GetDirectories(pathApp + "/nand/user/save","010*",SearchOption.AllDirectories).Select(d => Path.GetFileName(d)).ToList();
-                directorys.AddRange(files);
-                directorys.AddRange(files2);
-                directorys.AddRange(files3);
+                List<String> directorys = Directory.GetDirectories(pathApp ,"010*",SearchOption.AllDirectories).Select(d => Path.GetFileName(d).ToUpper()).ToList();
                 directorys = directorys.Distinct().ToList();
 
                 HttpClient _httpClient = httpClient();
@@ -851,7 +424,8 @@ namespace YuzuEAUpdater
         {
             try
             {
-                string sourceDir = Path.Combine(pathApp, "nand", "user", "save");
+                MainUI.addTextConsole("Save game backup..." + "\n");
+               string sourceDir = Path.Combine(pathApp, "nand", "user", "save");
                 DirectoryInfo directoryInfo = new DirectoryInfo(sourceDir);
                 if (this.backupSave && directoryInfo.Exists && directoryInfo.GetDirectories().Length>0)
                 {
@@ -876,7 +450,7 @@ namespace YuzuEAUpdater
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.StackTrace + "  " + ex.Message + "\n");
+                MainUI.addTextConsole(ex.StackTrace + "  " + ex.Message + "\n");
                  Console.ReadLine();
             }
 
@@ -895,7 +469,7 @@ namespace YuzuEAUpdater
         }
 
 
-        private void restoreLatestBackup()
+        public void restoreLatestBackup()
         {
             string backupDir = Path.Combine(Environment.CurrentDirectory, "savesBackup");
             DirectoryInfo dirInfo = new DirectoryInfo(backupDir);
@@ -906,19 +480,19 @@ namespace YuzuEAUpdater
                 {
                     Array.Sort(files, (x, y) => y.CreationTime.CompareTo(x.CreationTime));
                     FileInfo latestBackup = files[0];
-                    addTextConsole("Restoring latest backup: " + latestBackup.CreationTime.ToString() + "\n");
+                    MainUI.addTextConsole("Restoring latest backup: " + latestBackup.CreationTime.ToString() + "\n");
                     SevenZip.SevenZipExtractor extractor = new SevenZip.SevenZipExtractor(latestBackup.FullName);
                     extractor.ExtractArchive(Path.Combine(pathApp, "nand", "user", "save"));
-                    addTextConsole("Restore complete.\n");
+                    MainUI.addTextConsole("Restore complete.\n");
                 }
                 else
                 {
-                    addTextConsole("No backup file found.\n");
+                    MainUI.addTextConsole("No backup file found.\n");
                 }
             }
             else
             {
-                addTextConsole("Backup directory does not exist.\n");
+                MainUI.addTextConsole("Backup directory does not exist.\n");
             }
         }
 
@@ -937,7 +511,7 @@ namespace YuzuEAUpdater
 
         private void purgeUncessaryFiles()
         {
-            UI.addTextConsole("Purging uncessary files...\n");
+            MainUI.addTextConsole("Purging uncessary files...\n");
             //FIND all FILLS THAT BEGIN WITH yuzu-windows-msvc-source- in current directory
            var files = Directory.GetFiles(Environment.CurrentDirectory, "yuzu-windows-msvc-source-*");
             foreach (var file in files)
@@ -946,11 +520,11 @@ namespace YuzuEAUpdater
                 {
                     System.IO.File.Delete(file);
                     FileInfo fileInfo = new FileInfo(file);
-                    UI.addTextConsole(" -Deleted " + fileInfo.Name + "\n");
+                    MainUI.addTextConsole(" -Deleted " + fileInfo.Name + "\n");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.StackTrace + "  " + ex.Message + "\n");
+                    MainUI.addTextConsole(ex.StackTrace + "  " + ex.Message + "\n");
                     Console.ReadLine();
                 }
             }
@@ -958,9 +532,9 @@ namespace YuzuEAUpdater
         }
 
 
-        private void checkUpdate()
+        public void checkUpdate()
         {
-            addTextConsole("W'll restart for updates...\n");
+            MainUI.addTextConsole("W'll restart for updates...\n");
 
                 WebClient webClient = new WebClient();
 

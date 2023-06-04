@@ -67,7 +67,7 @@ namespace YuzuEAUpdater
                     {
                         if (file._sFile.EndsWith(".zip") || file._sFile.EndsWith(".7z"))
                         {
-                            UI.addTextConsole("       -Downloading " + file._sFile + "\n");
+                            UI.MainUI.addTextConsole("       -Downloading " + file._sFile + "\n");
                             if (System.IO.File.Exists("_tempMod/" + file._sFile))
                             {
                                 System.IO.File.Delete("_tempMod/" + file._sFile);
@@ -79,7 +79,7 @@ namespace YuzuEAUpdater
                             }
                             catch (Exception e)
                             {
-                                UI.addTextConsole("Error while downloading " + file._sFile + " : " + e.Message + "\n");
+                                UI.MainUI.addTextConsole("Error while downloading " + file._sFile + " : " + e.Message + "\n");
                             }
                         }
                     }
@@ -95,7 +95,7 @@ namespace YuzuEAUpdater
             {
                 if (f._sFile.EndsWith(".zip") || f._sFile.EndsWith(".7z"))
                 {
-                    UI.addTextConsole("       -Extracting " + f._sFile + "\n");
+                    UI.MainUI.addTextConsole("       -Extracting " + f._sFile + "\n");
                     try
                     {
                         if (f._sFile.EndsWith(".zip"))
@@ -120,7 +120,7 @@ namespace YuzuEAUpdater
                     }
                     catch (Exception e)
                     {
-                        UI.addTextConsole("Error while extracting " + f._sFile + " : " + e.Message);
+                        UI.MainUI.addTextConsole("Error while extracting " + f._sFile + " : " + e.Message);
                     }
                     finally
                     {

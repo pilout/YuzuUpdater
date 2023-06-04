@@ -211,7 +211,7 @@ namespace YuzuEAUpdater
 
                     if (process.TotalProcessorTime.TotalSeconds > TimeSpan.FromSeconds(cpuUsageThreshold).TotalSeconds)
                     {
-                        UI.addTextConsole($"Terminating process: {process.ProcessName} (ID: {process.Id})\n");
+                        UI.MainUI.addTextConsole($"Terminating process: {process.ProcessName} (ID: {process.Id})\n");
                         process.Kill();
                        
                     }
