@@ -503,7 +503,7 @@ namespace YuzuEAUpdater
 
             if (!Directory.Exists(pathApp))
                 pathApp = "user";
-            if (!Directory.Exists(pathApp + "/sdmc/atmosphere/contents"))
+            if (!Directory.Exists(pathApp))
                 pathApp = "";
 
         }
